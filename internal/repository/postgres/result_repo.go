@@ -42,3 +42,19 @@ func (r *ResultRepo) GetInferenceResultByStudentAndTask(ctx context.Context, stu
 	}
 	return &result, nil
 }
+
+func (r *ResultRepo) GetAllInferenceResults(ctx context.Context) ([]models.InferenceResult, error) {
+	var results []models.InferenceResult
+	if err := r.db.WithContext(ctx).Preload("Student").Preload("Task").Find(&results).Error; err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (r *ResultRepo) GetInferenceResultsByStudentID(ctx context.Context, studentID string) ([]models.InferenceResult, error) {
+	var results []models.InferenceResult
+	if err := r.db.WithContext(ctx).Where("student_id = ?", studentID).Preload("Task").Find(&results).Error; err != nil {
+		return nil, err
+	}
+	return results, nil
+}

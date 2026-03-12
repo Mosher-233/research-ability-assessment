@@ -37,7 +37,7 @@ func (r *UserRepo) GetUserByEmail(ctx context.Context, email string) (*models.Us
 
 func (r *UserRepo) GetStudents(ctx context.Context) ([]models.Student, error) {
 	var students []models.Student
-	if err := r.db.WithContext(ctx).Where("role = ?", "student").Find(&students).Error; err != nil {
+	if err := r.db.WithContext(ctx).Table("users").Where("role = ?", "student").Find(&students).Error; err != nil {
 		return nil, err
 	}
 	return students, nil
@@ -45,7 +45,7 @@ func (r *UserRepo) GetStudents(ctx context.Context) ([]models.Student, error) {
 
 func (r *UserRepo) GetTeachers(ctx context.Context) ([]models.Teacher, error) {
 	var teachers []models.Teacher
-	if err := r.db.WithContext(ctx).Where("role = ?", "teacher").Find(&teachers).Error; err != nil {
+	if err := r.db.WithContext(ctx).Table("users").Where("role = ?", "teacher").Find(&teachers).Error; err != nil {
 		return nil, err
 	}
 	return teachers, nil

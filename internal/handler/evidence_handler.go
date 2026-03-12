@@ -21,7 +21,7 @@ type CreateEvidenceRequest struct {
 	Type         string `json:"type" binding:"required"`
 	Content      string `json:"content" binding:"required"`
 	KBMName      string `json:"kbm_name" binding:"required"`
-	KBMLevel     int    `json:"kbm_level" binding:"required,min=1,max=5"`
+	KBMLevel     int    `json:"kbm_level" binding:"omitempty,min=1,max=5"`
 }
 
 func (h *EvidenceHandler) CreateEvidence(c *gin.Context) {
@@ -142,5 +142,62 @@ func (h *EvidenceHandler) GetEvidencesByStudentAndTask(c *gin.Context) {
 		"code":    200,
 		"message": "获取证据成功",
 		"data":    evidences,
+	})
+}
+
+func (h *EvidenceHandler) GetEvidences(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未授权",
+			"data":    nil,
+		})
+		return
+	}
+
+	evidences, err := h.evidenceService.GetEvidencesByUserID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取证据失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "获取证据成功",
+		"data":    evidences,
+	})
+}
+
+func (h *EvidenceHandler) AnalyzeEvidence(c *gin.Context) {
+	evidenceID := c.Param("evidence_id")
+	if evidenceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "证据ID不能为空",
+			"data":    nil,
+		})
+		return
+	}
+
+	// 调用服务层进行AI分析
+	result, err := h.evidenceService.AnalyzeEvidence(c.Request.Context(), evidenceID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "分析证据失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "分析证据成功",
+		"data":    result,
 	})
 }

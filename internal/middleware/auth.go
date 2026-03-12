@@ -38,7 +38,7 @@ func AuthMiddleware(authService *service.AuthService) gin.HandlerFunc {
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"code":    401,
-				"message": "认证令牌无效",
+				"message": "认证令牌无效: " + err.Error(),
 				"data":    nil,
 			})
 			c.Abort()

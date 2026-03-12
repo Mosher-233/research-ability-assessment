@@ -7,6 +7,9 @@ services:
       MYSQL_DATABASE: research_assessment
       MYSQL_USER: mysqluser
       MYSQL_PASSWORD: mysqlpassword
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+      MYSQL_INIT_CONNECT: "SET NAMES utf8mb4"
     volumes:
       - mysql_data:/var/lib/mysql
     ports:

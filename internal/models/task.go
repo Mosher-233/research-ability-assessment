@@ -16,8 +16,9 @@ type Task struct {
 	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 	
-	Teacher     Teacher    `json:"teacher" gorm:"foreignKey:TeacherID"`
-	StudentTasks []StudentTask `json:"student_tasks" gorm:"foreignKey:TaskID"`
+	// 移除关联关系，避免迁移问题
+	// Teacher     Teacher    `json:"teacher" gorm:"foreignKey:TeacherID"`
+	// StudentTasks []StudentTask `json:"student_tasks" gorm:"foreignKey:TaskID"`
 }
 
 type StudentTask struct {
@@ -29,7 +30,8 @@ type StudentTask struct {
 	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 	
-	Task      Task      `json:"task" gorm:"foreignKey:TaskID"`
-	Student   Student   `json:"student" gorm:"foreignKey:StudentID"`
-	Evidences []Evidence `json:"evidences" gorm:"foreignKey:StudentTaskID"`
+	// 移除关联关系，避免迁移问题
+	// Task      Task      `json:"task" gorm:"foreignKey:TaskID"`
+	// Student   Student   `json:"student" gorm:"foreignKey:StudentID"`
+	// Evidences []Evidence `json:"evidences" gorm:"foreignKey:StudentTaskID"`
 }

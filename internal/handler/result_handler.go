@@ -162,3 +162,49 @@ func (h *ResultHandler) GenerateTaskReport(c *gin.Context) {
 		"data":    report,
 	})
 }
+
+func (h *ResultHandler) GetResults(c *gin.Context) {
+	results, err := h.inferenceService.GetAllInferenceResults(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取结果失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "获取结果成功",
+		"data":    results,
+	})
+}
+
+func (h *ResultHandler) GetStudentResults(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未授权",
+			"data":    nil,
+		})
+		return
+	}
+
+	results, err := h.inferenceService.GetInferenceResultsByStudentID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取结果失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "获取结果成功",
+		"data":    results,
+	})
+}

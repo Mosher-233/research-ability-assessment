@@ -92,11 +92,7 @@
         <div class="report-section">
           <h4>能力雷达图</h4>
           <div class="chart-container">
-            <!-- 雷达图占位符 -->
-            <div class="chart-placeholder">
-              <el-icon class="placeholder-icon"><PieChart /></el-icon>
-              <p>能力雷达图</p>
-            </div>
+            <div ref="radarChartRef" class="radar-chart"></div>
           </div>
         </div>
         
@@ -131,10 +127,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { Plus, PieChart } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { formatDate } from '../utils/format'
+import * as echarts from 'echarts'
+import { generateRadarData } from '../utils/chart'
+import { resultApi } from '../api/result'
+import { taskApi } from '../api/task'
 
 // 类型定义
 interface Report {
@@ -172,6 +172,10 @@ const reportForm = ref({
 })
 const reportDialogVisible = ref(false)
 const currentReport = ref<Report | null>(null)
+
+// 雷达图相关
+const radarChartRef = ref<HTMLElement | null>(null)
+let radarChart: echarts.ECharts | null = null
 
 // 模拟数据
 const mockReports: Report[] = [
@@ -238,31 +242,133 @@ const mockTasks: Task[] = [
 ]
 
 // 方法
-const loadReports = () => {
-  // 模拟API调用
-  reports.value = mockReports
+const loadReports = async () => {
+  try {
+    // 获取用户信息
+    const userStr = localStorage.getItem('user')
+    const user = userStr ? JSON.parse(userStr) : null
+    
+    if (user && user.role === 'student') {
+      // 学生用户获取自己的报告
+      const response = await resultApi.getStudentResults()
+      if (response.code === 200) {
+        // 转换后端数据格式为前端所需格式
+        reports.value = response.data.map((result: any) => ({
+          id: result.id,
+          studentId: result.student_id,
+          studentName: result.student_name,
+          taskId: result.task_id,
+          taskName: result.task_name,
+          reportType: 'detailed',
+          abilityScores: result.ability_scores || {
+            literatureReview: result.literature_review || 0,
+            researchDesign: result.research_design || 0,
+            dataAnalysis: result.data_analysis || 0,
+            criticalThinking: result.critical_thinking || 0,
+            academicWriting: result.academic_writing || 0
+          },
+          analysis: result.analysis || '',
+          suggestions: result.suggestions || [],
+          createdAt: result.created_at
+        }))
+      }
+    } else {
+      // 教师用户获取所有报告
+      const response = await resultApi.getResults()
+      if (response.code === 200) {
+        // 转换后端数据格式为前端所需格式
+        reports.value = response.data.map((result: any) => ({
+          id: result.id,
+          studentId: result.student_id,
+          studentName: result.student_name,
+          taskId: result.task_id,
+          taskName: result.task_name,
+          reportType: 'detailed',
+          abilityScores: result.ability_scores || {
+            literatureReview: result.literature_review || 0,
+            researchDesign: result.research_design || 0,
+            dataAnalysis: result.data_analysis || 0,
+            criticalThinking: result.critical_thinking || 0,
+            academicWriting: result.academic_writing || 0
+          },
+          analysis: result.analysis || '',
+          suggestions: result.suggestions || [],
+          createdAt: result.created_at
+        }))
+      }
+    }
+  } catch (error) {
+    ElMessage.error('获取报告列表失败')
+    console.error('Error loading reports:', error)
+  }
 }
 
-const loadStudents = () => {
-  // 模拟API调用
-  students.value = mockStudents
+const loadStudents = async () => {
+  try {
+    const response = await taskApi.getStudents()
+    if (response.code === 200) {
+      students.value = response.data.map((student: any) => ({
+        id: student.id,
+        name: student.name
+      }))
+    }
+  } catch (error) {
+    ElMessage.error('获取学生列表失败')
+    console.error('Error loading students:', error)
+  }
 }
 
-const loadTasks = () => {
-  // 模拟API调用
-  tasks.value = mockTasks
+const loadTasks = async () => {
+  try {
+    const response = await taskApi.getTasks()
+    if (response.code === 200) {
+      tasks.value = response.data.map((task: any) => ({
+        id: task.id,
+        title: task.title
+      }))
+    }
+  } catch (error) {
+    ElMessage.error('获取任务列表失败')
+    console.error('Error loading tasks:', error)
+  }
 }
 
 const generateReport = () => {
-  activeTab.value = 'generate'
+  // 获取用户信息
+  const userStr = localStorage.getItem('user')
+  const user = userStr ? JSON.parse(userStr) : null
+  
+  if (user && user.role === 'student') {
+    // 学生用户只能生成自己的报告
+    ElMessage.info('您只能查看自己的报告')
+  } else {
+    // 教师用户可以生成所有报告
+    activeTab.value = 'generate'
+  }
 }
 
-const submitReportForm = () => {
-  // 模拟API调用
-  ElMessage.success('报告生成成功！')
-  resetReportForm()
-  activeTab.value = 'list'
-  loadReports()
+const submitReportForm = async () => {
+  try {
+    if (!reportForm.value.studentId || !reportForm.value.taskId) {
+      ElMessage.warning('请选择学生和任务')
+      return
+    }
+    
+    const response = await resultApi.generateStudentReport(
+      reportForm.value.studentId,
+      reportForm.value.taskId
+    )
+    
+    if (response.code === 200) {
+      ElMessage.success('报告生成成功！')
+      resetReportForm()
+      activeTab.value = 'list'
+      await loadReports()
+    }
+  } catch (error) {
+    ElMessage.error('生成报告失败')
+    console.error('Error generating report:', error)
+  }
 }
 
 const resetReportForm = () => {
@@ -301,11 +407,71 @@ const getScoreColor = (score: number): string => {
   return '#f56c6c'
 }
 
+// 初始化雷达图
+const initRadarChart = () => {
+  if (!radarChartRef.value) return
+  
+  radarChart = echarts.init(radarChartRef.value)
+  updateRadarChart()
+}
+
+// 更新雷达图
+const updateRadarChart = () => {
+  if (!radarChart || !currentReport.value) return
+  
+  // 转换能力得分格式，使其符合generateRadarData的要求
+  const normalizedScores: Record<string, { score: number }> = {}
+  for (const [key, value] of Object.entries(currentReport.value.abilityScores)) {
+    normalizedScores[getAbilityName(key)] = { score: value / 100 }
+  }
+  
+  const chartData = generateRadarData(normalizedScores)
+  const option = {
+    radar: chartData.radar,
+    series: [{
+      type: 'radar',
+      data: chartData.series[0].data,
+      areaStyle: {
+        opacity: 0.2
+      },
+      lineStyle: {
+        width: 2
+      },
+      itemStyle: {
+        color: '#409EFF'
+      }
+    }]
+  }
+  
+  radarChart.setOption(option)
+}
+
+// 监听对话框显示状态
+watch(reportDialogVisible, (newVal) => {
+  if (newVal) {
+    // 延迟初始化，确保DOM已经渲染
+    setTimeout(() => {
+      initRadarChart()
+    }, 100)
+  } else {
+    // 对话框关闭时销毁雷达图
+    if (radarChart) {
+      radarChart.dispose()
+      radarChart = null
+    }
+  }
+})
+
+// 监听当前报告变化
+watch(currentReport, () => {
+  updateRadarChart()
+}, { deep: true })
+
 // 生命周期
-onMounted(() => {
-  loadReports()
-  loadStudents()
-  loadTasks()
+onMounted(async () => {
+  await loadReports()
+  await loadStudents()
+  await loadTasks()
 })
 </script>
 
@@ -367,6 +533,11 @@ onMounted(() => {
   justify-content: center;
   background-color: #f5f7fa;
   border-radius: 4px;
+}
+
+.radar-chart {
+  width: 100%;
+  height: 100%;
 }
 
 .chart-placeholder {

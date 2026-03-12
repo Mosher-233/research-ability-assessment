@@ -1,8 +1,6 @@
 package llm
 
 import (
-	"encoding/json"
-	"fmt"
 	"research-ability-assessment/internal/models"
 )
 

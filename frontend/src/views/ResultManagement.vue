@@ -77,21 +77,20 @@
 
       <h3 style="margin-top: 20px">能力雷达图</h3>
       <div class="chart-container">
-        <!-- 这里可以集成ECharts等图表库来展示雷达图 -->
-        <div class="placeholder-chart">
-          <p>能力雷达图将在此显示</p>
-        </div>
+        <div ref="radarChartRef" class="radar-chart"></div>
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { resultApi } from '../api/result'
 import type { InferenceResult, DimensionScore } from '../types/result'
 import { formatDateTime, formatScore } from '../utils/format'
+import * as echarts from 'echarts'
+import { generateRadarData } from '../utils/chart'
 
 // 结果列表相关
 const results = ref<InferenceResult[]>([])
@@ -105,6 +104,10 @@ const showResultDialog = ref(false)
 // 结果详情
 const resultDetails = ref<InferenceResult | null>(null)
 const dimensionScores = ref<DimensionScore[]>([])
+
+// 雷达图相关
+const radarChartRef = ref<HTMLElement | null>(null)
+let radarChart: echarts.ECharts | null = null
 
 // 获取等级类型
 const getLevelType = (level: string): string => {
@@ -120,109 +123,189 @@ const getLevelType = (level: string): string => {
 // 加载结果列表
 const loadResults = async () => {
   try {
-    // 这里简化处理，实际应该调用API获取结果列表
-    // 暂时使用模拟数据
-    results.value = [
-      {
-        id: '1',
-        student_id: 's1',
-        task_id: 't1',
-        overall_score: 0.85,
-        overall_level: '优秀',
-        dimension_scores: {
-          literature: {
-            name: 'literature',
-            score: 0.9,
-            level: '优秀',
-            details: '文献检索策略合理，综述质量高',
-            evidence_ids: ['e1', 'e2']
-          },
-          experiment_design: {
-            name: 'experiment_design',
-            score: 0.8,
-            level: '优秀',
-            details: '实验方案合理，变量控制较好',
-            evidence_ids: ['e3']
-          },
-          data_processing: {
-            name: 'data_processing',
-            score: 0.85,
-            level: '优秀',
-            details: '数据分析方法选择恰当，结果解释准确',
-            evidence_ids: ['e4']
-          },
-          innovation: {
-            name: 'innovation',
-            score: 0.75,
-            level: '良好',
-            details: '问题提出有一定新颖性，解决方案有一定原创性',
-            evidence_ids: ['e5']
+    // 获取用户信息
+    const userStr = localStorage.getItem('user')
+    const user = userStr ? JSON.parse(userStr) : null
+    
+    // 检查是否使用模拟数据
+    const token = localStorage.getItem('token')
+    if (token && token.startsWith('mock-token-')) {
+      // 使用模拟数据
+      if (user && user.role === 'student') {
+        // 学生用户只显示自己的结果
+        results.value = [
+          {
+            id: '1',
+            student_id: 's1',
+            task_id: 't1',
+            overall_score: 0.85,
+            overall_level: '优秀',
+            dimension_scores: {
+              literature: {
+                name: 'literature',
+                score: 0.9,
+                level: '优秀',
+                details: '文献检索策略合理，综述质量高',
+                evidence_ids: ['e1', 'e2']
+              },
+              experiment_design: {
+                name: 'experiment_design',
+                score: 0.8,
+                level: '优秀',
+                details: '实验方案合理，变量控制较好',
+                evidence_ids: ['e3']
+              },
+              data_processing: {
+                name: 'data_processing',
+                score: 0.85,
+                level: '优秀',
+                details: '数据分析方法选择恰当，结果解释准确',
+                evidence_ids: ['e4']
+              },
+              innovation: {
+                name: 'innovation',
+                score: 0.75,
+                level: '良好',
+                details: '问题提出有一定新颖性，解决方案有一定原创性',
+                evidence_ids: ['e5']
+              }
+            },
+            reasoning: '基于收集到的证据，对学生的研究能力进行了综合评估。总体得分为0.85，等级为优秀。各维度表现均衡，文献能力和实验设计能力突出。',
+            created_at: '2026-03-01T10:00:00Z',
+            updated_at: '2026-03-01T10:00:00Z',
+            student: {
+              id: 's1',
+              name: user.name,
+              student_id: user.student_id
+            },
+            task: {
+              id: 't1',
+              name: '研究方法课程作业'
+            }
           }
-        },
-        reasoning: '基于收集到的证据，对学生的研究能力进行了综合评估。总体得分为0.85，等级为优秀。各维度表现均衡，文献能力和实验设计能力突出。',
-        created_at: '2026-03-01T10:00:00Z',
-        updated_at: '2026-03-01T10:00:00Z',
-        student: {
-          id: 's1',
-          name: '张三',
-          student_id: '2022001'
-        },
-        task: {
-          id: 't1',
-          name: '2026春季学期研究能力评价'
+        ]
+      } else {
+        // 教师用户显示所有结果
+        results.value = [
+          {
+            id: '1',
+            student_id: 's1',
+            task_id: 't1',
+            overall_score: 0.85,
+            overall_level: '优秀',
+            dimension_scores: {
+              literature: {
+                name: 'literature',
+                score: 0.9,
+                level: '优秀',
+                details: '文献检索策略合理，综述质量高',
+                evidence_ids: ['e1', 'e2']
+              },
+              experiment_design: {
+                name: 'experiment_design',
+                score: 0.8,
+                level: '优秀',
+                details: '实验方案合理，变量控制较好',
+                evidence_ids: ['e3']
+              },
+              data_processing: {
+                name: 'data_processing',
+                score: 0.85,
+                level: '优秀',
+                details: '数据分析方法选择恰当，结果解释准确',
+                evidence_ids: ['e4']
+              },
+              innovation: {
+                name: 'innovation',
+                score: 0.75,
+                level: '良好',
+                details: '问题提出有一定新颖性，解决方案有一定原创性',
+                evidence_ids: ['e5']
+              }
+            },
+            reasoning: '基于收集到的证据，对学生的研究能力进行了综合评估。总体得分为0.85，等级为优秀。各维度表现均衡，文献能力和实验设计能力突出。',
+            created_at: '2026-03-01T10:00:00Z',
+            updated_at: '2026-03-01T10:00:00Z',
+            student: {
+              id: 's1',
+              name: '张三',
+              student_id: '2022001'
+            },
+            task: {
+              id: 't1',
+              name: '2026春季学期研究能力评价'
+            }
+          },
+          {
+            id: '2',
+            student_id: 's2',
+            task_id: 't1',
+            overall_score: 0.72,
+            overall_level: '良好',
+            dimension_scores: {
+              literature: {
+                name: 'literature',
+                score: 0.75,
+                level: '良好',
+                details: '文献检索策略基本合理，综述质量一般',
+                evidence_ids: ['e6']
+              },
+              experiment_design: {
+                name: 'experiment_design',
+                score: 0.7,
+                level: '良好',
+                details: '实验方案基本合理，变量控制一般',
+                evidence_ids: ['e7']
+              },
+              data_processing: {
+                name: 'data_processing',
+                score: 0.75,
+                level: '良好',
+                details: '数据分析方法选择基本恰当，结果解释基本准确',
+                evidence_ids: ['e8']
+              },
+              innovation: {
+                name: 'innovation',
+                score: 0.65,
+                level: '良好',
+                details: '问题提出缺乏新颖性，解决方案缺乏原创性',
+                evidence_ids: ['e9']
+              }
+            },
+            reasoning: '基于收集到的证据，对学生的研究能力进行了综合评估。总体得分为0.72，等级为良好。各维度表现基本均衡，但创新能力有待提高。',
+            created_at: '2026-03-02T14:30:00Z',
+            updated_at: '2026-03-02T14:30:00Z',
+            student: {
+              id: 's2',
+              name: '李四',
+              student_id: '2022002'
+            },
+            task: {
+              id: 't1',
+              name: '2026春季学期研究能力评价'
+            }
+          }
+        ]
+      }
+      total.value = results.value.length
+    } else {
+      // 调用后端API获取结果列表
+      if (user && user.role === 'student') {
+        // 学生用户获取自己的结果
+        const response = await resultApi.getStudentResults()
+        if (response.code === 200) {
+          results.value = response.data
+          total.value = response.data.length
         }
-      },
-      {
-        id: '2',
-        student_id: 's2',
-        task_id: 't1',
-        overall_score: 0.72,
-        overall_level: '良好',
-        dimension_scores: {
-          literature: {
-            name: 'literature',
-            score: 0.75,
-            level: '良好',
-            details: '文献检索策略基本合理，综述质量一般',
-            evidence_ids: ['e6']
-          },
-          experiment_design: {
-            name: 'experiment_design',
-            score: 0.7,
-            level: '良好',
-            details: '实验方案基本合理，变量控制一般',
-            evidence_ids: ['e7']
-          },
-          data_processing: {
-            name: 'data_processing',
-            score: 0.75,
-            level: '良好',
-            details: '数据分析方法选择基本恰当，结果解释基本准确',
-            evidence_ids: ['e8']
-          },
-          innovation: {
-            name: 'innovation',
-            score: 0.65,
-            level: '良好',
-            details: '问题提出缺乏新颖性，解决方案缺乏原创性',
-            evidence_ids: ['e9']
-          }
-        },
-        reasoning: '基于收集到的证据，对学生的研究能力进行了综合评估。总体得分为0.72，等级为良好。各维度表现基本均衡，但创新能力有待提高。',
-        created_at: '2026-03-02T14:30:00Z',
-        updated_at: '2026-03-02T14:30:00Z',
-        student: {
-          id: 's2',
-          name: '李四',
-          student_id: '2022002'
-        },
-        task: {
-          id: 't1',
-          name: '2026春季学期研究能力评价'
+      } else {
+        // 教师用户获取所有结果
+        const response = await resultApi.getResults()
+        if (response.code === 200) {
+          results.value = response.data
+          total.value = response.data.length
         }
       }
-    ]
-    total.value = results.value.length
+    }
   } catch (error) {
     console.error('加载结果失败:', error)
     ElMessage.error('加载结果失败')
@@ -257,6 +340,60 @@ const generateReport = async (resultId: string) => {
     ElMessage.error('生成报告失败')
   }
 }
+
+// 初始化雷达图
+const initRadarChart = () => {
+  if (!radarChartRef.value) return
+  
+  radarChart = echarts.init(radarChartRef.value)
+  updateRadarChart()
+}
+
+// 更新雷达图
+const updateRadarChart = () => {
+  if (!radarChart || !resultDetails.value) return
+  
+  const chartData = generateRadarData(resultDetails.value.dimension_scores)
+  const option = {
+    radar: chartData.radar,
+    series: [{
+      type: 'radar',
+      data: chartData.series[0].data,
+      areaStyle: {
+        opacity: 0.2
+      },
+      lineStyle: {
+        width: 2
+      },
+      itemStyle: {
+        color: '#409EFF'
+      }
+    }]
+  }
+  
+  radarChart.setOption(option)
+}
+
+// 监听对话框显示状态
+watch(showResultDialog, (newVal) => {
+  if (newVal) {
+    // 延迟初始化，确保DOM已经渲染
+    setTimeout(() => {
+      initRadarChart()
+    }, 100)
+  } else {
+    // 对话框关闭时销毁雷达图
+    if (radarChart) {
+      radarChart.dispose()
+      radarChart = null
+    }
+  }
+})
+
+// 监听结果详情变化
+watch(resultDetails, () => {
+  updateRadarChart()
+}, { deep: true })
 
 // 初始化
 onMounted(() => {
@@ -298,6 +435,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.radar-chart {
+  width: 100%;
+  height: 100%;
 }
 
 .placeholder-chart {

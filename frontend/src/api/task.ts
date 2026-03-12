@@ -15,6 +15,18 @@ export const taskApi = {
     return response.data
   },
   
+  // 获取学生分配的任务
+  getAssignedTasks: async (): Promise<{ code: number; message: string; data: Task[] }> => {
+    const response = await api.get('/tasks/students/assigned')
+    return response.data
+  },
+  
+  // 获取学生任务列表
+  getStudentTasks: async (taskID: string): Promise<{ code: number; message: string; data: StudentTask[] }> => {
+    const response = await api.get(`/tasks/${taskID}/students`)
+    return response.data
+  },
+  
   // 获取任务详情
   getTaskByID: async (taskID: string): Promise<{ code: number; message: string; data: Task }> => {
     const response = await api.get(`/tasks/${taskID}`)
@@ -27,8 +39,8 @@ export const taskApi = {
     return response.data
   },
   
-  // 获取学生任务列表
-  getStudentTasks: async (taskID: string): Promise<{ code: number; message: string; data: StudentTask[] }> => {
+  // 获取任务的学生列表
+  getTaskStudents: async (taskID: string): Promise<{ code: number; message: string; data: StudentTask[] }> => {
     const response = await api.get(`/tasks/${taskID}/students`)
     return response.data
   },
@@ -36,6 +48,12 @@ export const taskApi = {
   // 获取学生列表
   getStudents: async (): Promise<{ code: number; message: string; data: Student[] }> => {
     const response = await api.get('/tasks/students/list')
+    return response.data
+  },
+  
+  // 更新任务状态
+  updateTaskStatus: async (taskID: string, status: string): Promise<{ code: number; message: string; data: any }> => {
+    const response = await api.put(`/tasks/${taskID}/status`, { status })
     return response.data
   }
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"research-ability-assessment/internal/models"
 	"research-ability-assessment/internal/repository/postgres"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -84,6 +85,9 @@ func (s *AuthService) generateToken(user *models.User) (string, error) {
 }
 
 func (s *AuthService) ValidateToken(tokenString string) (*Claims, error) {
+	// 移除令牌中的空格和换行符
+	tokenString = strings.TrimSpace(tokenString)
+	
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte("secret_key"), nil
 	})

@@ -21,7 +21,7 @@ func (r *TaskRepo) CreateTask(ctx context.Context, task *models.Task) error {
 
 func (r *TaskRepo) GetTaskByID(ctx context.Context, id string) (*models.Task, error) {
 	var task models.Task
-	if err := r.db.WithContext(ctx).Preload("Teacher").First(&task, "id = ?", id).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&task, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &task, nil
@@ -45,7 +45,7 @@ func (r *TaskRepo) CreateStudentTask(ctx context.Context, studentTask *models.St
 
 func (r *TaskRepo) GetStudentTaskByID(ctx context.Context, id string) (*models.StudentTask, error) {
 	var studentTask models.StudentTask
-	if err := r.db.WithContext(ctx).Preload("Task").Preload("Student").First(&studentTask, "id = ?", id).Error; err != nil {
+	if err := r.db.WithContext(ctx).First(&studentTask, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &studentTask, nil
@@ -53,7 +53,7 @@ func (r *TaskRepo) GetStudentTaskByID(ctx context.Context, id string) (*models.S
 
 func (r *TaskRepo) GetStudentTasksByTaskID(ctx context.Context, taskID string) ([]models.StudentTask, error) {
 	var studentTasks []models.StudentTask
-	if err := r.db.WithContext(ctx).Where("task_id = ?", taskID).Preload("Student").Find(&studentTasks).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("task_id = ?", taskID).Find(&studentTasks).Error; err != nil {
 		return nil, err
 	}
 	return studentTasks, nil
@@ -64,4 +64,12 @@ func (r *TaskRepo) UpdateStudentTaskStatus(ctx context.Context, id string, statu
 		"status":   status,
 		"progress": progress,
 	}).Error
+}
+
+func (r *TaskRepo) GetAssignedTasks(ctx context.Context, studentID string) ([]models.Task, error) {
+	var tasks []models.Task
+	if err := r.db.WithContext(ctx).Joins("JOIN student_tasks ON tasks.id = student_tasks.task_id").Where("student_tasks.student_id = ?", studentID).Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }

@@ -2,6 +2,18 @@ import api from './auth'
 import type { InferenceResult } from '../types/result'
 
 export const resultApi = {
+  // 获取所有推理结果
+  getResults: async (): Promise<{ code: number; message: string; data: InferenceResult[] }> => {
+    const response = await api.get('/results')
+    return response.data
+  },
+  
+  // 获取学生的推理结果
+  getStudentResults: async (): Promise<{ code: number; message: string; data: InferenceResult[] }> => {
+    const response = await api.get('/results/student')
+    return response.data
+  },
+  
   // 获取推理结果详情
   getInferenceResultByID: async (resultID: string): Promise<{ code: number; message: string; data: InferenceResult }> => {
     const response = await api.get(`/results/${resultID}`)

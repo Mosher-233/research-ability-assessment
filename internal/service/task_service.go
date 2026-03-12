@@ -76,3 +76,7 @@ func (s *TaskService) UpdateStudentTaskStatus(ctx context.Context, taskID string
 func (s *TaskService) GetStudents(ctx context.Context) ([]models.Student, error) {
 	return s.userRepo.GetStudents(ctx)
 }
+
+func (s *TaskService) GetAssignedTasks(ctx context.Context, studentID string) ([]models.Task, error) {
+	return s.taskRepo.GetAssignedTasks(ctx, studentID)
+}

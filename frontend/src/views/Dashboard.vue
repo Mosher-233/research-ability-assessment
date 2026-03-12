@@ -6,18 +6,25 @@
         <h2>研究能力评价系统</h2>
       </div>
       <nav class="sidebar-menu">
+        <!-- 任务管理 - 教师和学生都可以看到 -->
         <router-link to="/dashboard/tasks" class="menu-item">
           <el-icon><i-ep-task /></el-icon>
-          <span>任务管理</span>
+          <span>{{ user?.role === 'teacher' ? '任务管理' : '我的任务' }}</span>
         </router-link>
+        
+        <!-- 证据管理 - 教师和学生都可以看到 -->
         <router-link to="/dashboard/evidences" class="menu-item">
           <el-icon><i-ep-document /></el-icon>
           <span>证据管理</span>
         </router-link>
+        
+        <!-- 结果管理 - 教师和学生都可以看到 -->
         <router-link to="/dashboard/results" class="menu-item">
           <el-icon><i-ep-data-analysis /></el-icon>
           <span>结果管理</span>
         </router-link>
+        
+        <!-- 报告管理 - 教师和学生都可以看到 -->
         <router-link to="/dashboard/reports" class="menu-item">
           <el-icon><i-ep-document-copy /></el-icon>
           <span>报告管理</span>

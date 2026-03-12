@@ -19,6 +19,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('../views/Dashboard.vue'),
+    redirect: '/dashboard/tasks',
     children: [
       {
         path: 'tasks',

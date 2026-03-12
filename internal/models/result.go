@@ -10,13 +10,14 @@ type InferenceResult struct {
 	TaskID          string            `json:"task_id" gorm:"not null"`
 	OverallScore    float64           `json:"overall_score" gorm:"not null"`
 	OverallLevel    string            `json:"overall_level" gorm:"not null"`
-	DimensionScores map[string]DimensionScore `json:"dimension_scores" gorm:"type:jsonb"`
+	DimensionScores map[string]DimensionScore `json:"dimension_scores" gorm:"type:json"`
 	Reasoning       string            `json:"reasoning" gorm:"not null"`
 	CreatedAt       time.Time         `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt       time.Time         `json:"updated_at" gorm:"autoUpdateTime"`
 	
-	Student         Student           `json:"student" gorm:"foreignKey:StudentID"`
-	Task            Task              `json:"task" gorm:"foreignKey:TaskID"`
+	// 移除关联关系，避免迁移问题
+	// Student         Student           `json:"student" gorm:"foreignKey:StudentID"`
+	// Task            Task              `json:"task" gorm:"foreignKey:TaskID"`
 }
 
 type DimensionScore struct {

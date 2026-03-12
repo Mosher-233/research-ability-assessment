@@ -40,3 +40,11 @@ func (s *InferenceService) GetInferenceResultByStudentAndTask(ctx context.Contex
 func (s *InferenceService) GetEvidencesByStudentAndTask(ctx context.Context, studentID string, taskID string) ([]models.Evidence, error) {
 	return s.evidenceService.GetEvidencesByStudentAndTask(ctx, studentID, taskID)
 }
+
+func (s *InferenceService) GetAllInferenceResults(ctx context.Context) ([]models.InferenceResult, error) {
+	return s.resultRepo.GetAllInferenceResults(ctx)
+}
+
+func (s *InferenceService) GetInferenceResultsByStudentID(ctx context.Context, studentID string) ([]models.InferenceResult, error) {
+	return s.resultRepo.GetInferenceResultsByStudentID(ctx, studentID)
+}

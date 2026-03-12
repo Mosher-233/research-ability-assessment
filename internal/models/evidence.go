@@ -14,5 +14,6 @@ type Evidence struct {
 	CreatedAt      time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt      time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 	
-	StudentTask    StudentTask `json:"student_task" gorm:"foreignKey:StudentTaskID"`
+	// 移除关联关系，避免外键约束问题
+	// StudentTask    StudentTask `json:"student_task" gorm:"foreignKey:StudentTaskID"`
 }
