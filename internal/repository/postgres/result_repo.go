@@ -58,3 +58,47 @@ func (r *ResultRepo) GetInferenceResultsByStudentID(ctx context.Context, student
 	}
 	return results, nil
 }
+
+func (r *ResultRepo) CreateReport(ctx context.Context, report *models.Report) error {
+	return r.db.WithContext(ctx).Create(report).Error
+}
+
+func (r *ResultRepo) GetReportByID(ctx context.Context, id string) (*models.Report, error) {
+	var report models.Report
+	if err := r.db.WithContext(ctx).First(&report, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &report, nil
+}
+
+func (r *ResultRepo) GetReportByStudentAndTask(ctx context.Context, studentID string, taskID string) (*models.Report, error) {
+	var report models.Report
+	if err := r.db.WithContext(ctx).First(&report, "student_id = ? AND task_id = ?", studentID, taskID).Error; err != nil {
+		return nil, err
+	}
+	return &report, nil
+}
+
+func (r *ResultRepo) GetReportsByTaskID(ctx context.Context, taskID string) ([]models.Report, error) {
+	var reports []models.Report
+	if err := r.db.WithContext(ctx).Where("task_id = ?", taskID).Find(&reports).Error; err != nil {
+		return nil, err
+	}
+	return reports, nil
+}
+
+func (r *ResultRepo) GetReportsByStudentID(ctx context.Context, studentID string) ([]models.Report, error) {
+	var reports []models.Report
+	if err := r.db.WithContext(ctx).Where("student_id = ?", studentID).Find(&reports).Error; err != nil {
+		return nil, err
+	}
+	return reports, nil
+}
+
+func (r *ResultRepo) GetAllReports(ctx context.Context) ([]models.Report, error) {
+	var reports []models.Report
+	if err := r.db.WithContext(ctx).Find(&reports).Error; err != nil {
+		return nil, err
+	}
+	return reports, nil
+}

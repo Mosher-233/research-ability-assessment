@@ -77,7 +77,7 @@ func main() {
 	authService := service.NewAuthService(userRepo)
 	taskService := service.NewTaskService(taskRepo, userRepo)
 	inferenceService := service.NewInferenceService(resultRepo, evidenceService)
-	reportService := service.NewReportService(inferenceService)
+	reportService := service.NewReportService(inferenceService, resultRepo)
 	log.Println("服务初始化成功")
 
 	// 初始化Agent
@@ -96,7 +96,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	taskHandler := handler.NewTaskHandler(taskService)
 	evidenceHandler := handler.NewEvidenceHandler(evidenceService)
-	resultHandler := handler.NewResultHandler(inferenceService, reportService)
+	resultHandler := handler.NewResultHandler(inferenceService, reportService, resultRepo)
 	log.Println("处理器初始化成功")
 
 	// 初始化路由
@@ -165,7 +165,9 @@ func migrateDatabase(db *gorm.DB) {
 		&models.Task{},
 		&models.StudentTask{},
 		&models.Evidence{},
+		&models.Feedback{},
 		&models.InferenceResult{},
+		&models.Report{},
 	)
 }
 
@@ -252,17 +254,22 @@ func setupRouter(authService *service.AuthService, authHandler *handler.AuthHand
 			task.GET("/:task_id/students", taskHandler.GetStudentTasks)
 			task.GET("/students/list", taskHandler.GetStudents)
 			task.GET("/students/assigned", taskHandler.GetAssignedTasks)
+			task.GET("/student-tasks", taskHandler.GetStudentTasksList)
 		}
 
 		// 证据路由
 		evidence := protected.Group("/evidences")
 		{
 			evidence.POST("", evidenceHandler.CreateEvidence)
+			evidence.POST("/upload", evidenceHandler.UploadEvidenceFile)
 			evidence.GET("", evidenceHandler.GetEvidences)
 			evidence.GET("/:evidence_id", evidenceHandler.GetEvidenceByID)
+			evidence.GET("/:evidence_id/download", evidenceHandler.DownloadFile)
 			evidence.POST("/:evidence_id/analyze", evidenceHandler.AnalyzeEvidence)
+			evidence.GET("/:evidence_id/feedback", evidenceHandler.GetFeedbackByEvidenceID)
 			evidence.GET("/student-task/:student_task_id", evidenceHandler.GetEvidencesByStudentTaskID)
 			evidence.GET("/student-task", evidenceHandler.GetEvidencesByStudentAndTask)
+			evidence.GET("/feedbacks/list", evidenceHandler.GetFeedbacks)
 		}
 
 		// 结果路由
@@ -273,8 +280,15 @@ func setupRouter(authService *service.AuthService, authHandler *handler.AuthHand
 			result.GET("/:result_id", resultHandler.GetInferenceResultByID)
 			result.GET("/task/:task_id", resultHandler.GetInferenceResultsByTaskID)
 			result.GET("/student-task", resultHandler.GetInferenceResultByStudentAndTask)
+			result.POST("/generate", resultHandler.GenerateInferenceResult)
 			result.GET("/report/student", resultHandler.GenerateStudentReport)
 			result.GET("/report/task/:task_id", resultHandler.GenerateTaskReport)
+		}
+
+		// 报告路由
+		report := protected.Group("/reports")
+		{
+			report.POST("/generate", resultHandler.GenerateReport)
 		}
 	}
 

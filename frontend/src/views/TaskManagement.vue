@@ -119,7 +119,14 @@
         <el-descriptions-item label="任务名称">{{ taskDetails?.name }}</el-descriptions-item>
         <el-descriptions-item label="课程ID">{{ taskDetails?.course_id }}</el-descriptions-item>
         <el-descriptions-item label="任务描述">{{ taskDetails?.description }}</el-descriptions-item>
-        <el-descriptions-item label="教师ID">{{ taskDetails?.teacher_id }}</el-descriptions-item>
+        <el-descriptions-item label="教师">
+          <template v-if="taskDetails?.teacher">
+            {{ taskDetails.teacher.name }} ({{ taskDetails.teacher_id }})
+          </template>
+          <template v-else>
+            {{ taskDetails?.teacher_id }}
+          </template>
+        </el-descriptions-item>
         <el-descriptions-item label="开始日期">{{ formatDateTime(taskDetails?.start_date) }}</el-descriptions-item>
         <el-descriptions-item label="结束日期">{{ formatDateTime(taskDetails?.end_date) }}</el-descriptions-item>
         <el-descriptions-item label="状态"><el-tag :type="getStatusType(taskDetails?.status || '')">{{ getStatusText(taskDetails?.status || '') }}</el-tag></el-descriptions-item>
@@ -163,12 +170,25 @@ const pageSize = ref(10)
 const total = ref(0)
 const activeTab = ref('active')
 
+// 去重函数
+const deduplicateTasks = (tasks: any[]) => {
+  const seen = new Set()
+  return tasks.filter(task => {
+    if (seen.has(task.id)) {
+      return false
+    }
+    seen.add(task.id)
+    return true
+  })
+}
+
 // 计算属性：分开显示已完成和未完成任务
 const filteredTasks = computed(() => {
+  const uniqueTasks = deduplicateTasks(tasks.value)
   if (activeTab.value === 'active') {
-    return tasks.value.filter(task => task.status !== 'completed' && task.status !== 'archived')
+    return uniqueTasks.filter(task => task.status !== 'completed' && task.status !== 'archived')
   } else {
-    return tasks.value.filter(task => task.status === 'completed' || task.status === 'archived')
+    return uniqueTasks.filter(task => task.status === 'completed' || task.status === 'archived')
   }
 })
 
@@ -484,11 +504,17 @@ const viewTaskDetails = async (taskId: string) => {
       taskDetails.value = taskResponse.data
     }
     
-    // 获取学生任务列表
+    // 获取学生任务列表并去重
     const studentTaskResponse = await taskApi.getStudentTasks(taskId)
     console.log('学生任务列表响应:', studentTaskResponse)
     if (studentTaskResponse.code === 200) {
-      studentTasks.value = studentTaskResponse.data
+      // 根据student_id去重
+      const seen = new Set()
+      studentTasks.value = studentTaskResponse.data.filter((st: any) => {
+        if (seen.has(st.student_id)) return false
+        seen.add(st.student_id)
+        return true
+      })
     }
     
     showTaskDialog.value = true

@@ -21,10 +21,15 @@ export const taskApi = {
     return response.data
   },
   
-  // 获取学生任务列表
-  getStudentTasks: async (taskID: string): Promise<{ code: number; message: string; data: StudentTask[] }> => {
-    const response = await api.get(`/tasks/${taskID}/students`)
-    return response.data
+  // 获取学生任务列表（带详细信息）
+  getStudentTasks: async (taskID?: string): Promise<{ code: number; message: string; data: StudentTask[] }> => {
+    if (taskID) {
+      const response = await api.get(`/tasks/${taskID}/students`)
+      return response.data
+    } else {
+      const response = await api.get('/tasks/student-tasks')
+      return response.data
+    }
   },
   
   // 获取任务详情

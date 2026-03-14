@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"research-ability-assessment/internal/models"
 	"research-ability-assessment/internal/service"
 
@@ -19,9 +21,13 @@ func NewEvidenceHandler(evidenceService *service.EvidenceService) *EvidenceHandl
 type CreateEvidenceRequest struct {
 	StudentTaskID string `json:"student_task_id" binding:"required"`
 	Type         string `json:"type" binding:"required"`
-	Content      string `json:"content" binding:"required"`
+	Content      string `json:"content"`
 	KBMName      string `json:"kbm_name" binding:"required"`
 	KBMLevel     int    `json:"kbm_level" binding:"omitempty,min=1,max=5"`
+	FileName     string `json:"file_name"`
+	FilePath     string `json:"file_path"`
+	FileType     string `json:"file_type"`
+	FileSize     int64  `json:"file_size"`
 }
 
 func (h *EvidenceHandler) CreateEvidence(c *gin.Context) {
@@ -41,6 +47,10 @@ func (h *EvidenceHandler) CreateEvidence(c *gin.Context) {
 		Content:      req.Content,
 		KBMName:      req.KBMName,
 		KBMLevel:     req.KBMLevel,
+		FileName:     req.FileName,
+		FilePath:     req.FilePath,
+		FileType:     req.FileType,
+		FileSize:     req.FileSize,
 	}
 
 	if err := h.evidenceService.CreateEvidence(c.Request.Context(), evidence); err != nil {
@@ -58,6 +68,112 @@ func (h *EvidenceHandler) CreateEvidence(c *gin.Context) {
 		"data":    evidence,
 	})
 }
+
+func (h *EvidenceHandler) UploadEvidenceFile(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "请选择文件",
+			"data":    nil,
+		})
+		return
+	}
+
+	studentTaskID := c.PostForm("student_task_id")
+	evidenceType := c.PostForm("type")
+	kbmName := c.PostForm("kbm_name")
+	if studentTaskID == "" || evidenceType == "" || kbmName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "参数不完整",
+			"data":    nil,
+		})
+		return
+	}
+
+	uploadDir := "./uploads/evidences"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "创建上传目录失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	fileName := file.Filename
+	filePath := filepath.Join(uploadDir, fileName)
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "保存文件失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	content := ""
+	ext := filepath.Ext(fileName)
+	if ext == ".txt" || ext == ".md" {
+		fileContent, err := os.ReadFile(filePath)
+		if err == nil {
+			content = string(fileContent)
+		}
+	}
+
+	evidence := &models.Evidence{
+		StudentTaskID: studentTaskID,
+		Type:         evidenceType,
+		Content:      content,
+		KBMName:      kbmName,
+		FileName:     fileName,
+		FilePath:     filePath,
+		FileType:     ext,
+		FileSize:     file.Size,
+	}
+
+	if err := h.evidenceService.CreateEvidence(c.Request.Context(), evidence); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "创建证据失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "上传证据成功",
+		"data":    evidence,
+	})
+}
+
+func (h *EvidenceHandler) DownloadFile(c *gin.Context) {
+	evidenceID := c.Param("evidence_id")
+	if evidenceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "证据ID不能为空",
+			"data":    nil,
+		})
+		return
+	}
+
+	evidence, err := h.evidenceService.GetEvidenceByID(c.Request.Context(), evidenceID)
+	if err != nil || evidence.FilePath == "" {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    404,
+			"message": "文件不存在",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.FileAttachment(evidence.FilePath, evidence.FileName)
+}
+
+
 
 func (h *EvidenceHandler) GetEvidenceByID(c *gin.Context) {
 	evidenceID := c.Param("evidence_id")
@@ -147,6 +263,8 @@ func (h *EvidenceHandler) GetEvidencesByStudentAndTask(c *gin.Context) {
 
 func (h *EvidenceHandler) GetEvidences(c *gin.Context) {
 	userID := c.GetString("userID")
+	userRole := c.GetString("role")
+
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"code":    401,
@@ -156,7 +274,15 @@ func (h *EvidenceHandler) GetEvidences(c *gin.Context) {
 		return
 	}
 
-	evidences, err := h.evidenceService.GetEvidencesByUserID(c.Request.Context(), userID)
+	var evidences interface{}
+	var err error
+
+	if userRole == "teacher" {
+		evidences, err = h.evidenceService.GetEvidencesWithDetailsByTeacherID(c.Request.Context(), userID)
+	} else {
+		evidences, err = h.evidenceService.GetEvidencesByUserID(c.Request.Context(), userID)
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -184,7 +310,6 @@ func (h *EvidenceHandler) AnalyzeEvidence(c *gin.Context) {
 		return
 	}
 
-	// 调用服务层进行AI分析
 	result, err := h.evidenceService.AnalyzeEvidence(c.Request.Context(), evidenceID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -199,5 +324,61 @@ func (h *EvidenceHandler) AnalyzeEvidence(c *gin.Context) {
 		"code":    200,
 		"message": "分析证据成功",
 		"data":    result,
+	})
+}
+
+func (h *EvidenceHandler) GetFeedbackByEvidenceID(c *gin.Context) {
+	evidenceID := c.Param("evidence_id")
+	if evidenceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "证据ID不能为空",
+			"data":    nil,
+		})
+		return
+	}
+
+	feedback, err := h.evidenceService.GetFeedbackByEvidenceID(c.Request.Context(), evidenceID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取反馈失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "获取反馈成功",
+		"data":    feedback,
+	})
+}
+
+func (h *EvidenceHandler) GetFeedbacks(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    401,
+			"message": "未授权",
+			"data":    nil,
+		})
+		return
+	}
+
+	feedbacks, err := h.evidenceService.GetFeedbacksByUserID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "获取反馈失败",
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "获取反馈成功",
+		"data":    feedbacks,
 	})
 }

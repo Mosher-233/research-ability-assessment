@@ -46,3 +46,10 @@ docker-compose.override.yml
 tmp/
 temp/
 *.tmp
+
+# Uploads directory (contains user-uploaded files)
+uploads/
+
+# Server executable
+server
+server.exe

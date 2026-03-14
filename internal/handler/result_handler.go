@@ -10,13 +10,87 @@ import (
 type ResultHandler struct {
 	inferenceService *service.InferenceService
 	reportService    *service.ReportService
+	resultRepo       interface{}
 }
 
-func NewResultHandler(inferenceService *service.InferenceService, reportService *service.ReportService) *ResultHandler {
+func NewResultHandler(inferenceService *service.InferenceService, reportService *service.ReportService, resultRepo interface{}) *ResultHandler {
 	return &ResultHandler{
 		inferenceService: inferenceService,
 		reportService:    reportService,
+		resultRepo:       resultRepo,
 	}
+}
+
+type GenerateInferenceRequest struct {
+	StudentTaskID string `json:"student_task_id" binding:"required"`
+	StudentID     string `json:"student_id" binding:"required"`
+	TaskID        string `json:"task_id" binding:"required"`
+}
+
+type GenerateReportRequest struct {
+	StudentTaskID string `json:"student_task_id" binding:"required"`
+	StudentID     string `json:"student_id" binding:"required"`
+	TaskID        string `json:"task_id" binding:"required"`
+}
+
+func (h *ResultHandler) GenerateInferenceResult(c *gin.Context) {
+	var req GenerateInferenceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "请求参数错误: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	result, err := h.inferenceService.GenerateInference(c.Request.Context(), &service.GenerateInferenceRequest{
+		StudentTaskID: req.StudentTaskID,
+		StudentID:     req.StudentID,
+		TaskID:        req.TaskID,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "生成推理结果失败: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "生成推理结果成功",
+		"data":    result,
+	})
+}
+
+func (h *ResultHandler) GenerateReport(c *gin.Context) {
+	var req GenerateReportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "请求参数错误: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	report, err := h.reportService.GenerateReport(c.Request.Context(), req.StudentTaskID, req.StudentID, req.TaskID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "生成报告失败: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "生成报告成功",
+		"data":    report,
+	})
 }
 
 func (h *ResultHandler) GetInferenceResultByID(c *gin.Context) {

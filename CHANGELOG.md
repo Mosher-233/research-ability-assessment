@@ -1,5 +1,86 @@
 # 更新日志
 
+## 2026-03-14
+
+### 核心功能：结果管理和报告管理完善
+- **完整的推理服务（InferenceService）实现**
+  - 实现`GenerateInference()`方法，基于证据生成综合评估结果
+  - 实现`GetClassStats()`方法，获取班级统计数据（平均分、最高分、最低分、维度平均分）
+  - 实现`CalculateRankAndPercentile()`方法，计算学生排名和百分位
+  - 支持4个默认评估维度：文献综述、研究设计、数据分析、批判性思维（各权重0.25）
+  - 支持简化推理和LLM智能推理两种模式
+
+- **完整的报告服务（ReportService）实现**
+  - 实现`GenerateReport()`方法，生成详尽的研究能力评价报告
+  - 班级对比分析：班级人数、平均分、最高分、最低分、各维度平均分
+  - 排名分析：班级排名、超越比例（百分位）
+  - 优势劣势分析：自动识别≥80分的优势维度和<70分的待提升维度
+  - 个性化改进建议：针对每个待提升维度提供具体建议、可执行行动项、推荐学习资源
+  - 能力雷达图数据生成
+  - 自动生成并保存格式化的TXT报告文件到uploads/reports目录
+
+### 数据模型扩展
+- 新增`internal/models/report.go`：完整的报告相关数据模型
+  - `Report`模型：包含综合评价、班级对比、排名、建议等完整信息
+  - `ClassComparisonData`：班级对比数据
+  - `ImprovementSuggestion`：改进建议模型
+  - `LearningResource`：学习资源模型
+  - `RadarChartData`：雷达图数据模型
+  - `Dimension`：评估维度模型
+
+- 新增`internal/models/feedback.go`：反馈模型
+- 更新`internal/models/evidence.go`：添加文件支持字段（FileName、FilePath、FileType、FileSize）
+
+### 基础设施完善
+- **有序ID生成器（pkg/utils/id_generator.go）**
+  - 新增`GenerateEvidenceID()`函数：证据ID格式为EV+日期+序号
+  - 保持教师ID（T+日期+序号）、学生ID（S+日期+序号）、任务ID（TK+日期+序号）的有序性
+
+- **仓库层扩展（internal/repository/postgres/result_repo.go）**
+  - 新增`CreateReport()`方法
+  - 新增`GetReportByID()`方法
+  - 新增`GetReportByStudentAndTask()`方法
+  - 新增`GetReportsByTaskID()`方法
+  - 新增`GetReportsByStudentID()`方法
+  - 新增`GetAllReports()`方法
+
+- **API层扩展**
+  - 新增`POST /api/v1/results/generate`：生成推理结果
+  - 新增`POST /api/v1/reports/generate`：生成完整报告
+  - 更新`internal/handler/result_handler.go`：添加完整的结果和报告处理器
+
+- **数据库迁移**
+  - 在`cmd/server/main.go`中添加Report模型的自动迁移
+  - 在`migrateDatabase()`函数中注册&models.Report{}
+
+### 前端功能完善
+- 更新`frontend/src/views/EvidenceManagement.vue`：
+  - 支持任务去重
+  - 支持文件上传
+  - 支持AI反馈查看
+  - 教师界面实时查看学生证据
+
+- 更新`frontend/src/views/TaskManagement.vue`：
+  - 修复学生ID重复显示问题
+  - 添加学生任务列表去重逻辑
+
+### 问题修复
+- **学生ID重复显示问题**：前端添加去重逻辑，后端分配任务时检查是否已分配
+- **创建任务和分配任务的500错误**：将日期字段从time.Time改为string，手动解析日期
+- **证据上传问题**：完善文件上传和下载API
+- **后端编译错误**：修复所有类型错误和未使用变量问题
+
+### 文档完善
+- 新增`docs/result_and_report_management.md`：
+  - 从学生角度详细说明结果管理和报告管理的使用流程和关注点
+  - 从教师角度详细说明教学应用场景和关注点
+  - 从产品角度说明设计原则和未来扩展方向
+  - 包含系统实现细节、API接口说明、核心服务介绍
+  - 提供真实使用场景示例
+
+### 初始化脚本
+- 新增`scripts/init_db.go`：数据库初始化脚本，支持创建测试用户和清空表
+
 ## 2024-11-12
 
 ### 后端更新

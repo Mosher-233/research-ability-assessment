@@ -73,3 +73,11 @@ func (r *TaskRepo) GetAssignedTasks(ctx context.Context, studentID string) ([]mo
 	}
 	return tasks, nil
 }
+
+func (r *TaskRepo) GetStudentTasksByStudentID(ctx context.Context, studentID string) ([]models.StudentTask, error) {
+	var studentTasks []models.StudentTask
+	if err := r.db.WithContext(ctx).Where("student_id = ?", studentID).Find(&studentTasks).Error; err != nil {
+		return nil, err
+	}
+	return studentTasks, nil
+}

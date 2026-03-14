@@ -5,11 +5,11 @@ import (
 	"errors"
 	"research-ability-assessment/internal/models"
 	"research-ability-assessment/internal/repository/postgres"
+	"research-ability-assessment/pkg/utils"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -28,16 +28,16 @@ type Claims struct {
 }
 
 func (s *AuthService) Register(ctx context.Context, user *models.User) error {
-	// 生成UUID
-	user.ID = uuid.New().String()
-	
+	// 生成有序ID
+	user.ID = utils.GenerateUserID(user.Role)
+
 	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 	user.Password = string(hashedPassword)
-	
+
 	// 创建用户
 	return s.userRepo.CreateUser(ctx, user)
 }
@@ -48,19 +48,19 @@ func (s *AuthService) Login(ctx context.Context, email string, password string) 
 	if err != nil {
 		return "", errors.New("用户不存在")
 	}
-	
+
 	// 验证密码
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
 		return "", errors.New("密码错误")
 	}
-	
+
 	// 生成JWT令牌
 	token, err := s.generateToken(user)
 	if err != nil {
 		return "", err
 	}
-	
+
 	return token, nil
 }
 
@@ -74,32 +74,32 @@ func (s *AuthService) generateToken(user *models.User) (string, error) {
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
 	}
-	
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte("secret_key"))
 	if err != nil {
 		return "", err
 	}
-	
+
 	return tokenString, nil
 }
 
 func (s *AuthService) ValidateToken(tokenString string) (*Claims, error) {
 	// 移除令牌中的空格和换行符
 	tokenString = strings.TrimSpace(tokenString)
-	
+
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte("secret_key"), nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
 		return claims, nil
 	}
-	
+
 	return nil, errors.New("无效的令牌")
 }
 
