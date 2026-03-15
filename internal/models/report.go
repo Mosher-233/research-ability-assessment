@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"gorm.io/datatypes"
 )
 
 type Report struct {
@@ -11,15 +13,15 @@ type Report struct {
 	TaskID          string                 `json:"task_id" gorm:"not null;index"`
 	OverallScore    float64                `json:"overall_score" gorm:"not null"`
 	OverallLevel    string                 `json:"overall_level" gorm:"not null"`
-	DimensionScores map[string]DimensionScore `json:"dimension_scores" gorm:"type:json"`
-	ClassComparison *ClassComparisonData    `json:"class_comparison" gorm:"type:json"`
+	DimensionScores datatypes.JSON         `json:"dimension_scores" gorm:"type:json"`
+	ClassComparison datatypes.JSON         `json:"class_comparison" gorm:"type:json"`
 	Rank            int                    `json:"rank" gorm:"default:0"`
 	Percentile      float64                `json:"percentile" gorm:"default:0"`
-	Strengths       []string               `json:"strengths" gorm:"type:json"`
-	Weaknesses      []string               `json:"weaknesses" gorm:"type:json"`
-	DetailedAnalysis map[string]string     `json:"detailed_analysis" gorm:"type:json"`
-	Suggestions     []ImprovementSuggestion `json:"suggestions" gorm:"type:json"`
-	RadarChartData  *RadarChartData        `json:"radar_chart_data" gorm:"type:json"`
+	Strengths       datatypes.JSON         `json:"strengths" gorm:"type:json"`
+	Weaknesses      datatypes.JSON         `json:"weaknesses" gorm:"type:json"`
+	DetailedAnalysis datatypes.JSON        `json:"detailed_analysis" gorm:"type:json"`
+	Suggestions     datatypes.JSON         `json:"suggestions" gorm:"type:json"`
+	RadarChartData  datatypes.JSON         `json:"radar_chart_data" gorm:"type:json"`
 	ReportPath      string                 `json:"report_path" gorm:"size:500"`
 	CreatedAt       time.Time              `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt       time.Time              `json:"updated_at" gorm:"autoUpdateTime"`

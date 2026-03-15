@@ -123,3 +123,7 @@ func (s *TaskService) GetUserByID(ctx context.Context, id string) (*models.User,
 func (s *TaskService) GetStudentTasksByStudentID(ctx context.Context, studentID string) ([]models.StudentTask, error) {
 	return s.taskRepo.GetStudentTasksByStudentID(ctx, studentID)
 }
+
+func (s *TaskService) GetStudentTaskByStudentAndTask(ctx context.Context, studentID string, taskID string) (*models.StudentTask, error) {
+	return s.taskRepo.GetStudentTaskByStudentAndTask(ctx, studentID, taskID)
+}

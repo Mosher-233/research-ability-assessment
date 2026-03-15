@@ -382,3 +382,30 @@ func (h *EvidenceHandler) GetFeedbacks(c *gin.Context) {
 		"data":    feedbacks,
 	})
 }
+
+func (h *EvidenceHandler) DeleteEvidence(c *gin.Context) {
+	evidenceID := c.Param("evidence_id")
+	if evidenceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "证据ID不能为空",
+			"data":    nil,
+		})
+		return
+	}
+
+	if err := h.evidenceService.DeleteEvidence(c.Request.Context(), evidenceID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "删除证据失败: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "删除证据成功",
+		"data":    nil,
+	})
+}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -11,6 +12,8 @@ import (
 	"research-ability-assessment/pkg/utils"
 	"strings"
 	"time"
+
+	"gorm.io/datatypes"
 )
 
 type ReportService struct {
@@ -18,12 +21,18 @@ type ReportService struct {
 	resultRepo       interface {
 		CreateInferenceResult(ctx context.Context, result *models.InferenceResult) error
 		GetInferenceResultByStudentAndTask(ctx context.Context, studentID string, taskID string) (*models.InferenceResult, error)
+		CreateReport(ctx context.Context, report *models.Report) error
+		GetReportByID(ctx context.Context, id string) (*models.Report, error)
+		GetReportByStudentAndTask(ctx context.Context, studentID string, taskID string) (*models.Report, error)
 	}
 }
 
 func NewReportService(inferenceService *InferenceService, resultRepo interface {
 	CreateInferenceResult(ctx context.Context, result *models.InferenceResult) error
 	GetInferenceResultByStudentAndTask(ctx context.Context, studentID string, taskID string) (*models.InferenceResult, error)
+	CreateReport(ctx context.Context, report *models.Report) error
+	GetReportByID(ctx context.Context, id string) (*models.Report, error)
+	GetReportByStudentAndTask(ctx context.Context, studentID string, taskID string) (*models.Report, error)
 }) *ReportService {
 	return &ReportService{
 		inferenceService: inferenceService,
@@ -34,16 +43,31 @@ func NewReportService(inferenceService *InferenceService, resultRepo interface {
 func (s *ReportService) GenerateReport(ctx context.Context, studentTaskID, studentID, taskID string) (*models.Report, error) {
 	log.Printf("GenerateReport: 开始生成报告, StudentTaskID=%s, StudentID=%s, TaskID=%s", studentTaskID, studentID, taskID)
 
+	// 先检查是否已有报告
+	existingReport, err := s.resultRepo.GetReportByStudentAndTask(ctx, studentID, taskID)
+	if err == nil && existingReport != nil {
+		log.Printf("GenerateReport: 找到已有报告, ReportID=%s", existingReport.ID)
+		return existingReport, nil
+	}
+
 	inferenceResult, err := s.inferenceService.GetInferenceResultByStudentAndTask(ctx, studentID, taskID)
 	if err != nil {
 		log.Printf("GenerateReport: 没有找到现有推理结果，开始生成新的推理")
-		inferenceResult, err = s.inferenceService.GenerateInference(ctx, &GenerateInferenceRequest{
+		inferenceResult, err = s.inferenceService.GenerateInferenceWithLLM(ctx, &GenerateInferenceRequest{
 			StudentTaskID: studentTaskID,
 			StudentID:     studentID,
 			TaskID:        taskID,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("生成推理结果失败: %w", err)
+			log.Printf("GenerateReport: 生成推理结果失败: %v, 尝试使用简化方法", err)
+			inferenceResult, err = s.inferenceService.GenerateInference(ctx, &GenerateInferenceRequest{
+				StudentTaskID: studentTaskID,
+				StudentID:     studentID,
+				TaskID:        taskID,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("生成推理结果失败: %w", err)
+			}
 		}
 	}
 
@@ -66,11 +90,16 @@ func (s *ReportService) GenerateReport(ctx context.Context, studentTaskID, stude
 		percentile = 0
 	}
 
-	strengths := s.getStrengths(inferenceResult.DimensionScores)
-	weaknesses := s.getWeaknesses(inferenceResult.DimensionScores)
-	detailedAnalysis := s.generateDetailedAnalysis(inferenceResult, classStats, rank, percentile)
-	suggestions := s.generateSuggestions(inferenceResult, weaknesses)
-	radarChartData := s.generateRadarChartData(inferenceResult, classStats)
+	var dimensionScores map[string]models.DimensionScore
+	if len(inferenceResult.DimensionScores) > 0 {
+		_ = json.Unmarshal(inferenceResult.DimensionScores, &dimensionScores)
+	}
+
+	strengths := s.getStrengths(dimensionScores)
+	weaknesses := s.getWeaknesses(dimensionScores)
+	detailedAnalysis := s.generateDetailedAnalysis(inferenceResult, classStats, rank, percentile, dimensionScores)
+	suggestions := s.generateSuggestions(inferenceResult, weaknesses, dimensionScores)
+	radarChartData := s.generateRadarChartData(inferenceResult, classStats, dimensionScores)
 
 	classComparison := &models.ClassComparisonData{
 		ClassSize:         classStats.ClassSize,
@@ -80,6 +109,13 @@ func (s *ReportService) GenerateReport(ctx context.Context, studentTaskID, stude
 		DimensionAverages: classStats.DimensionAverages,
 	}
 
+	classComparisonJSON, _ := json.Marshal(classComparison)
+	strengthsJSON, _ := json.Marshal(strengths)
+	weaknessesJSON, _ := json.Marshal(weaknesses)
+	detailedAnalysisJSON, _ := json.Marshal(detailedAnalysis)
+	suggestionsJSON, _ := json.Marshal(suggestions)
+	radarChartDataJSON, _ := json.Marshal(radarChartData)
+
 	report := &models.Report{
 		ID:               utils.GenerateTaskID(),
 		StudentTaskID:    studentTaskID,
@@ -88,14 +124,14 @@ func (s *ReportService) GenerateReport(ctx context.Context, studentTaskID, stude
 		OverallScore:     inferenceResult.OverallScore,
 		OverallLevel:     inferenceResult.OverallLevel,
 		DimensionScores:  inferenceResult.DimensionScores,
-		ClassComparison:  classComparison,
+		ClassComparison:  datatypes.JSON(classComparisonJSON),
 		Rank:             rank,
 		Percentile:       percentile,
-		Strengths:        strengths,
-		Weaknesses:       weaknesses,
-		DetailedAnalysis: detailedAnalysis,
-		Suggestions:      suggestions,
-		RadarChartData:   radarChartData,
+		Strengths:        datatypes.JSON(strengthsJSON),
+		Weaknesses:       datatypes.JSON(weaknessesJSON),
+		DetailedAnalysis: datatypes.JSON(detailedAnalysisJSON),
+		Suggestions:      datatypes.JSON(suggestionsJSON),
+		RadarChartData:   datatypes.JSON(radarChartDataJSON),
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 	}
@@ -105,6 +141,13 @@ func (s *ReportService) GenerateReport(ctx context.Context, studentTaskID, stude
 		log.Printf("GenerateReport: 保存报告文件失败: %v", err)
 	} else {
 		report.ReportPath = reportPath
+	}
+
+	// 保存报告到数据库
+	if err := s.resultRepo.CreateReport(ctx, report); err != nil {
+		log.Printf("GenerateReport: 保存报告到数据库失败: %v", err)
+	} else {
+		log.Printf("GenerateReport: 报告保存到数据库成功, ReportID=%s", report.ID)
 	}
 
 	log.Printf("GenerateReport: 报告生成成功, ReportID=%s", report.ID)
@@ -137,7 +180,7 @@ func (s *ReportService) getWeaknesses(dimensionScores map[string]models.Dimensio
 	return weaknesses
 }
 
-func (s *ReportService) generateDetailedAnalysis(inferenceResult *models.InferenceResult, classStats *ClassStats, rank int, percentile float64) map[string]string {
+func (s *ReportService) generateDetailedAnalysis(inferenceResult *models.InferenceResult, classStats *ClassStats, rank int, percentile float64, dimensionScores map[string]models.DimensionScore) map[string]string {
 	analysis := make(map[string]string)
 
 	analysis["overview"] = fmt.Sprintf("学生在本次任务中的综合表现为%s，总得分为%.1f分。", inferenceResult.OverallLevel, inferenceResult.OverallScore)
@@ -148,7 +191,7 @@ func (s *ReportService) generateDetailedAnalysis(inferenceResult *models.Inferen
 		analysis["class_comparison"] = "暂无班级对比数据"
 	}
 
-	for dimID, score := range inferenceResult.DimensionScores {
+	for dimID, score := range dimensionScores {
 		classAvg := classStats.DimensionAverages[dimID]
 		if classAvg > 0 {
 			if score.Score >= classAvg {
@@ -164,7 +207,7 @@ func (s *ReportService) generateDetailedAnalysis(inferenceResult *models.Inferen
 	return analysis
 }
 
-func (s *ReportService) generateSuggestions(inferenceResult *models.InferenceResult, weaknesses []string) []models.ImprovementSuggestion {
+func (s *ReportService) generateSuggestions(inferenceResult *models.InferenceResult, weaknesses []string, dimensionScores map[string]models.DimensionScore) []models.ImprovementSuggestion {
 	var suggestions []models.ImprovementSuggestion
 
 	resourceMap := map[string][]models.LearningResource{
@@ -187,7 +230,7 @@ func (s *ReportService) generateSuggestions(inferenceResult *models.InferenceRes
 	}
 
 	priority := 1
-	for dimID, score := range inferenceResult.DimensionScores {
+	for dimID, score := range dimensionScores {
 		if score.Score < 75 {
 			targetScore := math.Min(score.Score+15, 100)
 			suggestion := models.ImprovementSuggestion{
@@ -265,12 +308,12 @@ func (s *ReportService) getActionItems(dimID string) []string {
 	return actionMap[dimID]
 }
 
-func (s *ReportService) generateRadarChartData(inferenceResult *models.InferenceResult, classStats *ClassStats) *models.RadarChartData {
+func (s *ReportService) generateRadarChartData(inferenceResult *models.InferenceResult, classStats *ClassStats, dimensionScores map[string]models.DimensionScore) *models.RadarChartData {
 	var labels []string
 	var values []float64
 	var classAverages []float64
 
-	for dimID, score := range inferenceResult.DimensionScores {
+	for dimID, score := range dimensionScores {
 		labels = append(labels, score.Name)
 		values = append(values, score.Score)
 		classAverages = append(classAverages, classStats.DimensionAverages[dimID])
@@ -319,37 +362,53 @@ func (s *ReportService) saveReportToFile(report *models.Report) (string, error) 
 	content.WriteString("二、维度得分\n")
 	content.WriteString(strings.Repeat("-", 60))
 	content.WriteString("\n")
-	for _, score := range report.DimensionScores {
-		content.WriteString(fmt.Sprintf("%s: %.1f分 (%s)\n", score.Name, score.Score, score.Level))
+	var dimensionScores map[string]models.DimensionScore
+	if len(report.DimensionScores) > 0 {
+		_ = json.Unmarshal(report.DimensionScores, &dimensionScores)
+		for _, score := range dimensionScores {
+			content.WriteString(fmt.Sprintf("%s: %.1f分 (%s)\n", score.Name, score.Score, score.Level))
+		}
 	}
 	content.WriteString("\n")
 
 	content.WriteString("三、优势分析\n")
 	content.WriteString(strings.Repeat("-", 60))
 	content.WriteString("\n")
-	for i, strength := range report.Strengths {
-		content.WriteString(fmt.Sprintf("%d. %s\n", i+1, strength))
+	var strengths []string
+	if len(report.Strengths) > 0 {
+		_ = json.Unmarshal(report.Strengths, &strengths)
+		for i, strength := range strengths {
+			content.WriteString(fmt.Sprintf("%d. %s\n", i+1, strength))
+		}
 	}
 	content.WriteString("\n")
 
 	content.WriteString("四、待提升方向\n")
 	content.WriteString(strings.Repeat("-", 60))
 	content.WriteString("\n")
-	for i, weakness := range report.Weaknesses {
-		content.WriteString(fmt.Sprintf("%d. %s\n", i+1, weakness))
+	var weaknesses []string
+	if len(report.Weaknesses) > 0 {
+		_ = json.Unmarshal(report.Weaknesses, &weaknesses)
+		for i, weakness := range weaknesses {
+			content.WriteString(fmt.Sprintf("%d. %s\n", i+1, weakness))
+		}
 	}
 	content.WriteString("\n")
 
 	content.WriteString("五、改进建议\n")
 	content.WriteString(strings.Repeat("-", 60))
 	content.WriteString("\n")
-	for _, suggestion := range report.Suggestions {
-		content.WriteString(fmt.Sprintf("\n【%s】(优先级: %d)\n", suggestion.DimensionName, suggestion.Priority))
-		content.WriteString(fmt.Sprintf("当前得分: %.1f → 目标得分: %.1f\n", suggestion.CurrentScore, suggestion.TargetScore))
-		content.WriteString(fmt.Sprintf("建议: %s\n", suggestion.Suggestion))
-		content.WriteString("行动项:\n")
-		for _, item := range suggestion.ActionItems {
-			content.WriteString(fmt.Sprintf("  - %s\n", item))
+	var suggestions []models.ImprovementSuggestion
+	if len(report.Suggestions) > 0 {
+		_ = json.Unmarshal(report.Suggestions, &suggestions)
+		for _, suggestion := range suggestions {
+			content.WriteString(fmt.Sprintf("\n【%s】(优先级: %d)\n", suggestion.DimensionName, suggestion.Priority))
+			content.WriteString(fmt.Sprintf("当前得分: %.1f → 目标得分: %.1f\n", suggestion.CurrentScore, suggestion.TargetScore))
+			content.WriteString(fmt.Sprintf("建议: %s\n", suggestion.Suggestion))
+			content.WriteString("行动项:\n")
+			for _, item := range suggestion.ActionItems {
+				content.WriteString(fmt.Sprintf("  - %s\n", item))
+			}
 		}
 	}
 	content.WriteString("\n")
@@ -375,4 +434,24 @@ func (s *ReportService) GenerateStudentReport(ctx context.Context, studentID str
 
 func (s *ReportService) GenerateTaskReport(ctx context.Context, taskID string) ([]models.InferenceResult, error) {
 	return s.inferenceService.GetInferenceResultsByTaskID(ctx, taskID)
+}
+
+func (s *ReportService) GetAllReports(ctx context.Context) ([]models.Report, error) {
+	repo, ok := s.resultRepo.(interface {
+		GetAllReports(ctx context.Context) ([]models.Report, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("result repo does not support GetAllReports")
+	}
+	return repo.GetAllReports(ctx)
+}
+
+func (s *ReportService) GetReportsByStudentID(ctx context.Context, studentID string) ([]models.Report, error) {
+	repo, ok := s.resultRepo.(interface {
+		GetReportsByStudentID(ctx context.Context, studentID string) ([]models.Report, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("result repo does not support GetReportsByStudentID")
+	}
+	return repo.GetReportsByStudentID(ctx, studentID)
 }

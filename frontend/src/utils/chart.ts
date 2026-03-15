@@ -1,13 +1,16 @@
 // 生成雷达图数据
 export const generateRadarData = (dimensionScores: Record<string, { score: number }>) => {
   const dimensions = Object.keys(dimensionScores)
-  const scores = dimensions.map(dim => dimensionScores[dim].score)
+  const scores = dimensions.map(dim => {
+    const score = dimensionScores[dim].score
+    return score <= 1 ? score * 100 : score
+  })
   
   return {
     radar: {
       indicator: dimensions.map(dim => ({
         name: dim,
-        max: 1
+        max: 100
       }))
     },
     series: [{
@@ -22,7 +25,10 @@ export const generateRadarData = (dimensionScores: Record<string, { score: numbe
 // 生成柱状图数据
 export const generateBarData = (results: Array<{ student: { name: string }; overall_score: number }>) => {
   const names = results.map(r => r.student.name)
-  const scores = results.map(r => r.overall_score)
+  const scores = results.map(r => {
+    const score = r.overall_score
+    return score <= 1 ? score * 100 : score
+  })
   
   return {
     xAxis: {
@@ -31,7 +37,7 @@ export const generateBarData = (results: Array<{ student: { name: string }; over
     },
     yAxis: {
       type: 'value',
-      max: 1
+      max: 100
     },
     series: [{
       data: scores,

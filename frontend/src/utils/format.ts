@@ -12,7 +12,8 @@ export const formatDateTime = (dateStr: string): string => {
 
 // 格式化得分
 export const formatScore = (score: number): string => {
-  return score.toFixed(2)
+  const normalizedScore = score <= 1 ? score * 100 : score
+  return normalizedScore.toFixed(0) + '分'
 }
 
 // 获取状态类型

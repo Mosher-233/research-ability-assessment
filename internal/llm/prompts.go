@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"encoding/json"
 	"fmt"
 	"research-ability-assessment/internal/models"
 )
@@ -38,8 +39,12 @@ func GetFeedbackPrompt(result *models.InferenceResult) []Message {
 	prompt += fmt.Sprintf("总体得分：%.2f，等级：%s\n", result.OverallScore, result.OverallLevel)
 	prompt += "各维度得分：\n"
 
-	for dimension, score := range result.DimensionScores {
-		prompt += fmt.Sprintf("- %s：得分 %.2f，等级 %s\n", dimension, score.Score, score.Level)
+	var dimensionScores map[string]models.DimensionScore
+	if len(result.DimensionScores) > 0 {
+		_ = json.Unmarshal(result.DimensionScores, &dimensionScores)
+		for dimension, score := range dimensionScores {
+			prompt += fmt.Sprintf("- %s：得分 %.2f，等级 %s\n", dimension, score.Score, score.Level)
+		}
 	}
 
 	return []Message{

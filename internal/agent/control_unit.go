@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"research-ability-assessment/internal/models"
@@ -100,16 +101,19 @@ func (c *ControlUnit) executeInference(ctx context.Context, task *EvaluationTask
 		return fmt.Errorf("能力推理失败: %w", err)
 	}
 
+	// 将维度得分序列化
+	dimensionScoresJSON, _ := json.Marshal(result.DimensionScores)
+
 	// 存储推理结果
 	inferenceResult := &models.InferenceResult{
-		ID:           uuid.New().String(),
-		StudentID:    task.StudentID,
-		TaskID:       task.TaskID,
-		OverallScore: result.OverallScore,
-		OverallLevel: result.OverallLevel,
-		DimensionScores: result.DimensionScores,
-		Reasoning:    result.Reasoning,
-		CreatedAt:    time.Now(),
+		ID:              uuid.New().String(),
+		StudentID:       task.StudentID,
+		TaskID:          task.TaskID,
+		OverallScore:    result.OverallScore,
+		OverallLevel:    result.OverallLevel,
+		DimensionScores: dimensionScoresJSON,
+		Reasoning:       result.Reasoning,
+		CreatedAt:       time.Now(),
 	}
 
 	if err := c.storage.StoreInferenceResult(ctx, inferenceResult); err != nil {

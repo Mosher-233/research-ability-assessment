@@ -81,3 +81,11 @@ func (r *TaskRepo) GetStudentTasksByStudentID(ctx context.Context, studentID str
 	}
 	return studentTasks, nil
 }
+
+func (r *TaskRepo) GetStudentTaskByStudentAndTask(ctx context.Context, studentID string, taskID string) (*models.StudentTask, error) {
+	var studentTask models.StudentTask
+	if err := r.db.WithContext(ctx).Where("student_id = ? AND task_id = ?", studentID, taskID).First(&studentTask).Error; err != nil {
+		return nil, err
+	}
+	return &studentTask, nil
+}

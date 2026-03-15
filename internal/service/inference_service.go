@@ -12,6 +12,8 @@ import (
 	"research-ability-assessment/pkg/utils"
 	"strings"
 	"time"
+
+	"gorm.io/datatypes"
 )
 
 type InferenceService struct {
@@ -119,13 +121,19 @@ func (s *InferenceService) GenerateInference(ctx context.Context, req *GenerateI
 	overallScore := totalWeightedScore / totalWeight
 	overallLevel := s.getLevelFromScore(overallScore)
 
+	dimensionScoresJSON, err := json.Marshal(dimensionScores)
+	if err != nil {
+		log.Printf("GenerateInference: 序列化维度得分失败: %v", err)
+		return nil, fmt.Errorf("序列化维度得分失败: %w", err)
+	}
+
 	result := &models.InferenceResult{
 		ID:              utils.GenerateTaskID(),
 		StudentID:       req.StudentID,
 		TaskID:          req.TaskID,
 		OverallScore:    math.Round(overallScore*100) / 100,
 		OverallLevel:    overallLevel,
-		DimensionScores: dimensionScores,
+		DimensionScores: datatypes.JSON(dimensionScoresJSON),
 		Reasoning:       s.generateReasoning(overallScore, overallLevel, dimensionScores),
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
@@ -297,9 +305,13 @@ func (s *InferenceService) GetClassStats(ctx context.Context, taskID string) (*C
 			minScore = result.OverallScore
 		}
 
-		for id, score := range result.DimensionScores {
-			dimensionTotals[id] += score.Score
-			dimensionCounts[id]++
+		var dimensionScores map[string]models.DimensionScore
+		if len(result.DimensionScores) > 0 {
+			_ = json.Unmarshal(result.DimensionScores, &dimensionScores)
+			for id, score := range dimensionScores {
+				dimensionTotals[id] += score.Score
+				dimensionCounts[id]++
+			}
 		}
 	}
 
@@ -412,6 +424,15 @@ func (s *InferenceService) GenerateInferenceWithLLM(ctx context.Context, req *Ge
 		return s.GenerateInference(ctx, req)
 	}
 
+	log.Printf("GenerateInferenceWithLLM: 准备保存结果, ID=%s, OverallScore=%.2f, OverallLevel=%s",
+		result.ID, result.OverallScore, result.OverallLevel)
+
+	if err := s.resultRepo.CreateInferenceResult(ctx, result); err != nil {
+		log.Printf("GenerateInferenceWithLLM: 保存结果失败: %v", err)
+		return nil, fmt.Errorf("保存结果失败: %w", err)
+	}
+
+	log.Printf("GenerateInferenceWithLLM: 推理结果生成成功")
 	return result, nil
 }
 
@@ -468,8 +489,10 @@ func (s *InferenceService) parseLLMResponse(response string, req *GenerateInfere
 	var totalWeightedScore float64
 	dimensions := s.getDefaultDimensions()
 	weightMap := make(map[string]float64)
+	nameMap := make(map[string]string)
 	for _, dim := range dimensions {
 		weightMap[dim.ID] = dim.Weight
+		nameMap[dim.ID] = dim.Name
 	}
 
 	for dimID, score := range llmResp.DimensionScores {
@@ -478,8 +501,13 @@ func (s *InferenceService) parseLLMResponse(response string, req *GenerateInfere
 			weight = 0.25
 		}
 
+		dimName := nameMap[dimID]
+		if dimName == "" {
+			dimName = dimID
+		}
+
 		dimensionScores[dimID] = models.DimensionScore{
-			Name:    score.Level,
+			Name:    dimName,
 			Score:   score.Score,
 			Level:   score.Level,
 			Details: "",
@@ -491,13 +519,19 @@ func (s *InferenceService) parseLLMResponse(response string, req *GenerateInfere
 	overallScore := totalWeightedScore
 	overallLevel := s.getLevelFromScore(overallScore)
 
+	dimensionScoresJSON, err := json.Marshal(dimensionScores)
+	if err != nil {
+		log.Printf("parseLLMResponse: 序列化维度得分失败: %v", err)
+		return nil, fmt.Errorf("序列化维度得分失败: %w", err)
+	}
+
 	result := &models.InferenceResult{
 		ID:              utils.GenerateTaskID(),
 		StudentID:       req.StudentID,
 		TaskID:          req.TaskID,
 		OverallScore:    math.Round(overallScore*100) / 100,
 		OverallLevel:    overallLevel,
-		DimensionScores: dimensionScores,
+		DimensionScores: datatypes.JSON(dimensionScoresJSON),
 		Reasoning:       llmResp.OverallReasoning,
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),

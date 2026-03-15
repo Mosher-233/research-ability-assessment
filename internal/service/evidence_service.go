@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"research-ability-assessment/internal/llm"
@@ -96,10 +97,16 @@ func (s *EvidenceService) GetEvidencesWithDetailsByTeacherID(ctx context.Context
 
 // AnalyzeEvidence 分析证据并返回KBM级别和反馈，同时创建Feedback记录
 func (s *EvidenceService) AnalyzeEvidence(ctx context.Context, evidenceID string) (map[string]interface{}, error) {
+	log.Printf("AnalyzeEvidence: 开始分析证据, ID=%s", evidenceID)
+	
 	evidence, err := s.GetEvidenceByID(ctx, evidenceID)
 	if err != nil {
+		log.Printf("AnalyzeEvidence: 获取证据失败: %v", err)
 		return nil, err
 	}
+
+	log.Printf("AnalyzeEvidence: 证据信息 - 类型=%s, KBM名称=%s, 内容长度=%d", 
+		evidence.Type, evidence.KBMName, len(evidence.Content))
 
 	messages := []llm.Message{
 		{
@@ -112,39 +119,55 @@ func (s *EvidenceService) AnalyzeEvidence(ctx context.Context, evidenceID string
 		},
 	}
 
+	log.Printf("AnalyzeEvidence: 正在调用LLM API...")
 	response, err := s.llm.Chat(ctx, messages)
-	var kbmLevel int
-	var strengths, weaknesses, suggestions, feedback string
+	var parsedFeedback *llm.ParsedFeedback
 
 	if err != nil {
-		kbmLevel = 3
-		strengths = "对主题有基本了解，能够完成基本任务要求"
-		weaknesses = "深度分析不足，缺乏批判性思考"
-		suggestions = "建议阅读更多相关文献，尝试从多角度分析问题"
-		feedback = "证据内容分析：你对该主题有较好的理解，能够清晰表达自己的观点，但在深度分析方面还有提升空间。建议进一步深入研究相关文献，加强批判性思维能力。"
+		log.Printf("AnalyzeEvidence: LLM调用失败: %v", err)
+		log.Printf("AnalyzeEvidence: 使用默认反馈值")
+		parsedFeedback = &llm.ParsedFeedback{
+			KBMLevel:    3,
+			Strengths:   "对主题有基本了解，能够完成基本任务要求",
+			Weaknesses:  "深度分析不足，缺乏批判性思考",
+			Suggestions: "建议阅读更多相关文献，尝试从多角度分析问题",
+			Feedback:    "证据内容分析：你对该主题有较好的理解，能够清晰表达自己的观点，但在深度分析方面还有提升空间。建议进一步深入研究相关文献，加强批判性思维能力。\n\n注意：LLM API调用失败，此为默认反馈。",
+		}
 	} else {
-		kbmLevel = 3
-		strengths = "提交的证据内容较为完整"
-		weaknesses = "可进一步提升深度"
-		suggestions = "继续深入研究"
-		feedback = response
+		log.Printf("AnalyzeEvidence: LLM响应成功, 响应长度=%d", len(response))
+		log.Printf("AnalyzeEvidence: LLM响应内容: %s", response)
+		
+		parsedFeedback, err = llm.ParseFeedbackResponse(response)
+		if err != nil {
+			log.Printf("AnalyzeEvidence: 解析LLM响应失败: %v", err)
+			parsedFeedback = &llm.ParsedFeedback{
+				KBMLevel:    3,
+				Strengths:   "提交的证据内容较为完整",
+				Weaknesses:  "可进一步提升深度",
+				Suggestions: "继续深入研究",
+				Feedback:    response,
+			}
+		}
 	}
 
-	evidence.KBMLevel = kbmLevel
+	log.Printf("AnalyzeFeedback: 解析结果 - KBM级别=%d, 优点=%s, 不足=%s", 
+		parsedFeedback.KBMLevel, parsedFeedback.Strengths, parsedFeedback.Weaknesses)
+
+	evidence.KBMLevel = parsedFeedback.KBMLevel
 	if err := s.db.WithContext(ctx).Save(evidence).Error; err != nil {
 		return nil, err
 	}
 
 	feedbackID := utils.GenerateEvidenceID()
-	feedbackContent := feedback
+	feedbackContent := parsedFeedback.Feedback
 	feedbackRecord := &models.Feedback{
 		ID:          feedbackID,
 		EvidenceID:  evidenceID,
 		Content:     feedbackContent,
-		KBMLevel:    kbmLevel,
-		Strengths:   strengths,
-		Weaknesses:  weaknesses,
-		Suggestions: suggestions,
+		KBMLevel:    parsedFeedback.KBMLevel,
+		Strengths:   parsedFeedback.Strengths,
+		Weaknesses:  parsedFeedback.Weaknesses,
+		Suggestions: parsedFeedback.Suggestions,
 	}
 
 	if err := s.db.WithContext(ctx).Create(feedbackRecord).Error; err != nil {
@@ -160,7 +183,7 @@ func (s *EvidenceService) AnalyzeEvidence(ctx context.Context, evidenceID string
 	feedbackFilePath := filepath.Join(uploadDir, feedbackFileName)
 	feedbackFileContent := fmt.Sprintf(
 		"证据ID: %s\nKBM名称: %s\nKBM级别: %d\n\n优点:\n%s\n\n不足:\n%s\n\n建议:\n%s\n\n总体评价:\n%s",
-		evidenceID, evidence.KBMName, kbmLevel, strengths, weaknesses, suggestions, feedbackContent,
+		evidenceID, evidence.KBMName, parsedFeedback.KBMLevel, parsedFeedback.Strengths, parsedFeedback.Weaknesses, parsedFeedback.Suggestions, feedbackContent,
 	)
 
 	if err := os.WriteFile(feedbackFilePath, []byte(feedbackFileContent), 0644); err != nil {
@@ -174,11 +197,11 @@ func (s *EvidenceService) AnalyzeEvidence(ctx context.Context, evidenceID string
 	}
 
 	return map[string]interface{}{
-		"kbm_level":  kbmLevel,
-		"feedback":   feedback,
-		"strengths":  strengths,
-		"weaknesses": weaknesses,
-		"suggestions": suggestions,
+		"kbm_level":  parsedFeedback.KBMLevel,
+		"feedback":   parsedFeedback.Feedback,
+		"strengths":  parsedFeedback.Strengths,
+		"weaknesses": parsedFeedback.Weaknesses,
+		"suggestions": parsedFeedback.Suggestions,
 		"feedback_id": feedbackID,
 	}, nil
 }
@@ -199,6 +222,39 @@ func (s *EvidenceService) GetFeedbackByEvidenceID(ctx context.Context, evidenceI
 		return nil, err
 	}
 	return &feedback, nil
+}
+
+// DeleteEvidence 删除证据及其相关的反馈和文件
+func (s *EvidenceService) DeleteEvidence(ctx context.Context, evidenceID string) error {
+	evidence, err := s.GetEvidenceByID(ctx, evidenceID)
+	if err != nil {
+		return err
+	}
+
+	// 删除反馈记录
+	if err := s.db.WithContext(ctx).Where("evidence_id = ?", evidenceID).Delete(&models.Feedback{}).Error; err != nil {
+		return err
+	}
+
+	// 删除证据记录
+	if err := s.db.WithContext(ctx).Delete(&models.Evidence{}, "id = ?", evidenceID).Error; err != nil {
+		return err
+	}
+
+	// 删除证据文件
+	if evidence.FilePath != "" {
+		if err := os.Remove(evidence.FilePath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	// 删除反馈文件
+	feedbackFilePath := fmt.Sprintf("./uploads/feedback/feedback_%s.txt", evidenceID)
+	if err := os.Remove(feedbackFilePath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
 }
 
 // GetFeedbacksByUserID 根据用户ID获取所有反馈

@@ -10,8 +10,10 @@
           <el-input v-model="loginForm.password" placeholder="请输入密码" type="password" show-password></el-input>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleLogin" :loading="loading">登录</el-button>
-          <el-button @click="navigateToRegister">注册</el-button>
+          <div class="button-group">
+            <el-button type="primary" @click="handleLogin" :loading="loading" class="full-width-btn">登录</el-button>
+            <el-button @click="navigateToRegister" class="full-width-btn">注册</el-button>
+          </div>
         </el-form-item>
       </el-form>
     </div>
@@ -136,8 +138,15 @@ const navigateToRegister = () => {
   width: 100%;
 }
 
-.el-button {
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
-  margin-bottom: 10px;
+}
+
+.button-group :deep(.full-width-btn) {
+  width: 100% !important;
+  margin: 0 !important;
 }
 </style>

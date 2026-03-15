@@ -76,7 +76,7 @@ func main() {
 	evidenceService := service.NewEvidenceService(db, llmClient)
 	authService := service.NewAuthService(userRepo)
 	taskService := service.NewTaskService(taskRepo, userRepo)
-	inferenceService := service.NewInferenceService(resultRepo, evidenceService)
+	inferenceService := service.NewInferenceServiceWithLLM(resultRepo, evidenceService, llmClient)
 	reportService := service.NewReportService(inferenceService, resultRepo)
 	log.Println("服务初始化成功")
 
@@ -96,7 +96,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	taskHandler := handler.NewTaskHandler(taskService)
 	evidenceHandler := handler.NewEvidenceHandler(evidenceService)
-	resultHandler := handler.NewResultHandler(inferenceService, reportService, resultRepo)
+	resultHandler := handler.NewResultHandler(inferenceService, reportService, resultRepo, taskService, userRepo, taskRepo)
 	log.Println("处理器初始化成功")
 
 	// 初始化路由
@@ -270,6 +270,7 @@ func setupRouter(authService *service.AuthService, authHandler *handler.AuthHand
 			evidence.GET("/student-task/:student_task_id", evidenceHandler.GetEvidencesByStudentTaskID)
 			evidence.GET("/student-task", evidenceHandler.GetEvidencesByStudentAndTask)
 			evidence.GET("/feedbacks/list", evidenceHandler.GetFeedbacks)
+			evidence.DELETE("/:evidence_id", evidenceHandler.DeleteEvidence)
 		}
 
 		// 结果路由
@@ -281,6 +282,7 @@ func setupRouter(authService *service.AuthService, authHandler *handler.AuthHand
 			result.GET("/task/:task_id", resultHandler.GetInferenceResultsByTaskID)
 			result.GET("/student-task", resultHandler.GetInferenceResultByStudentAndTask)
 			result.POST("/generate", resultHandler.GenerateInferenceResult)
+			result.POST("/generate/student", resultHandler.GenerateStudentInference)
 			result.GET("/report/student", resultHandler.GenerateStudentReport)
 			result.GET("/report/task/:task_id", resultHandler.GenerateTaskReport)
 		}
@@ -289,6 +291,8 @@ func setupRouter(authService *service.AuthService, authHandler *handler.AuthHand
 		report := protected.Group("/reports")
 		{
 			report.POST("/generate", resultHandler.GenerateReport)
+			report.GET("", resultHandler.GetReports)
+			report.GET("/student", resultHandler.GetStudentReports)
 		}
 	}
 
