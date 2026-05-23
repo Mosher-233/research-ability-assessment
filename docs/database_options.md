@@ -6,8 +6,8 @@
 
 ### 关系型数据库（选择其一）
 
-1. **PostgreSQL**（默认，推荐）
-2. **MySQL**
+1. **MySQL**（默认，推荐）
+2. **PostgreSQL**
 3. **Supabase**（基于 PostgreSQL 的云服务）
 
 ### 图数据库（必须）
@@ -16,17 +16,17 @@
 
 ---
 
-## 二、PostgreSQL（默认配置）
+## 二、MySQL（默认配置）
 
 ### 使用配置文件：`configs/config.dev.yaml`
 
 ```yaml
 database:
-  type: postgres
+  type: mysql
   host: localhost
-  port: 5432
-  user: postgres
-  password: postgres
+  port: 3306
+  user: mysqluser
+  password: mysqlpassword
   dbname: research_assessment
   sslmode: disable
 ```
@@ -41,21 +41,19 @@ docker-compose up -d
 
 ---
 
-## 三、MySQL 配置
-
-### 使用配置文件：`configs/config.mysql.yaml`
+## 三、PostgreSQL 配置
 
 ### 步骤：
 
-1. **创建 MySQL 配置
+1. **创建 PostgreSQL 配置**
 
 ```yaml
 database:
-  type: mysql
+  type: postgres
   host: localhost
-  port: 3306
-  user: root
-  password: your_password
+  port: 5432
+  user: postgres
+  password: postgres
   dbname: research_assessment
   sslmode: disable
 ```
@@ -63,17 +61,16 @@ database:
 2. **创建数据库**
 
 ```sql
-CREATE DATABASE research_assessment CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE research_assessment;
 ```
 
-3. **设置环境变量或复制配置文件
+3. **设置环境变量或修改配置文件**
 
 ```bash
 # 方式 1：设置环境变量
-$env:APP_ENV="mysql"
+$env:APP_ENV="dev"
 
-# 方式 2：复制配置文件
-copy configs\config.mysql.yaml configs\config.yaml
+# 方式 2：直接修改 configs/config.dev.yaml
 ```
 
 4. **启动后端**
@@ -86,22 +83,20 @@ go run cmd/server/main.go
 
 ## 四、Supabase 配置
 
-### 使用配置文件：`configs/config.supabase.yaml`
-
 ### 步骤：
 
-1. **注册 Supabase 账号
+1. **注册 Supabase 账号**
 
 访问 [supabase.com](https://supabase.com) 并创建新项目
 
-2. **获取连接信息
+2. **获取连接信息**
 
 在 Supabase 项目设置中找到：
 - Project ID
 - Database Password
 - Connection Pooler（如果使用）
 
-3. **配置文件**
+3. **修改配置文件 `configs/config.dev.yaml`**
 
 ```yaml
 database:
@@ -117,13 +112,6 @@ database:
 4. **启动后端**
 
 ```bash
-# 设置环境变量
-$env:APP_ENV="supabase"
-
-# 或者复制配置文件
-copy configs\config.supabase.yaml configs\config.yaml
-
-# 启动服务
 go run cmd/server/main.go
 ```
 
@@ -143,7 +131,7 @@ docker-compose up -d
 
 Neo4j Web 界面：http://localhost:7474
 默认用户名：neo4j
-默认密码（首次登录后需要修改）
+默认密码：password123
 
 ### 配置文件
 
@@ -151,7 +139,7 @@ Neo4j Web 界面：http://localhost:7474
 neo4j:
   uri: bolt://localhost:7687
   username: neo4j
-  password: neo4jpassword
+  password: password123
 ```
 
 ---
@@ -164,28 +152,32 @@ neo4j:
 # 1. 启动所有数据库
 docker-compose up -d
 
-# 2. 安装 Go 依赖
+# 2. 配置环境变量
+copy .env.example .env
+# 编辑 .env，填入 DeepSeek API Key
+
+# 3. 安装 Go 依赖
 go mod tidy
 
-# 3. 启动后端
+# 4. 启动后端
 go run cmd/server/main.go
 
-# 4. 启动前端（新终端）
+# 5. （可选）初始化测试数据
+go run scripts/init_db.go
+
+# 6. 启动前端（新终端）
 cd frontend
 npm install
 npm run dev
 ```
 
-### 方案 B：使用 MySQL + Docker
+### 方案 B：使用 PostgreSQL + Docker
 
 ```bash
-# 1. 启动 MySQL 和 Neo4j（需要修改 docker-compose.yml）
-# 或者手动安装 MySQL
-
-# 2. 使用 MySQL 配置
-copy configs\config.mysql.yaml configs\config.yaml
-
-# 3. 编辑配置文件，填入你的 MySQL 密码
+# 1. 手动安装 PostgreSQL 或修改 docker-compose.yml
+# 2. 修改 configs/config.dev.yaml，将 database.type 改为 postgres
+# 3. 启动 Neo4j
+docker-compose up -d neo4j
 
 # 4. 启动后端
 go run cmd/server/main.go
@@ -196,15 +188,12 @@ go run cmd/server/main.go
 ```bash
 # 1. 注册 Supabase 并创建项目
 
-# 2. 使用 Supabase 配置
-copy configs\config.supabase.yaml configs\config.yaml
+# 2. 修改 configs/config.dev.yaml，填入 Supabase 连接信息
 
-# 3. 编辑配置文件，填入你的 Supabase 信息
-
-# 4. 启动 Neo4j（本地或使用 Docker）
+# 3. 启动 Neo4j（本地或使用 Docker）
 docker-compose up -d neo4j
 
-# 5. 启动后端
+# 4. 启动后端
 go run cmd/server/main.go
 ```
 
@@ -216,9 +205,7 @@ go run cmd/server/main.go
 
 ```bash
 # Windows PowerShell
-$env:APP_ENV="dev"      # PostgreSQL（默认）
-$env:APP_ENV="mysql"    # MySQL
-$env:APP_ENV="supabase" # Supabase
+$env:APP_ENV="dev"      # 默认（加载 configs/config.dev.yaml）
 
 # 然后启动
 go run cmd/server/main.go

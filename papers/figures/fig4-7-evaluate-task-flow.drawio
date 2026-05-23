@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="EvaluateTask流程">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="start" value="EvaluateTask(studentID, taskID)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="5" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="Step 1: StorageUnit.GetEvidences()&#xa;获取该学生的所有证据" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="60" width="220" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="Step 2: EvidenceAgent预处理&#xa;PreprocessEvidence + ClassifyEvidence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="120" width="220" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="Step 3: FeedbackAgent逐条分析&#xa;AnalyzeEvidence → 生成反馈(调用LLM)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="180" width="230" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="Step 4: InferenceAgent LLM推理(主路径)&#xa;InferWithLLM→四维度评分+证据引用" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="240" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" value="Step 5: LogicUnit规则兜底(降级路径)&#xa;LLM失败时: KBMLevel×20→维度平均" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="300" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="s6" value="Step 6: StorageUnit持久化&#xa;SaveResult + StoreCitations + UpdateGraph" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="360" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="s7" value="Step 7: FeedbackAgent生成反馈&#xa;LLM诊断性建议 + 规则兜底" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="70" y="420" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="s8" value="Step 8: GenerateReport()&#xa;综合报告(雷达图/对比/建议/引用)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="480" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="end" value="返回 EvaluationResult" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="545" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="a7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s7" target="s8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s8" target="end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s1" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s2" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s3" target="s4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s4" target="s5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s5" target="s6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s6" target="s7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a0" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="start" target="s1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="note1" value="n条证据 × 1次LLM调用" style="text;html=1;fontSize=8;fontColor=#9673a6;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="310" y="192" width="110" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="note2" value="1次LLM调用 (CoT推理)" style="text;html=1;fontSize=8;fontColor=#d6b656;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="310" y="252" width="110" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="formula" value="OverallScore = 0.25×D1 + 0.25×D2 + 0.25×D3 + 0.25×D4" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#f5f5f5;strokeColor=#666666;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="330" y="300" width="340" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

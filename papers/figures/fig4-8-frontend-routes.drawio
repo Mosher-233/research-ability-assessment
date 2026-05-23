@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="前端路由结构">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="root" value="/" style="ellipse;whiteSpace=wrap;html=1;fillColor=#6c8ebf;strokeColor=#6c8ebf;fontColor=#ffffff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="10" width="60" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="login" value="/login&#xa;Login.vue&#xa;（登录页）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="90" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="register" value="/register&#xa;Register.vue&#xa;（注册页）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="90" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="dashboard" value="/dashboard&#xa;Dashboard.vue&#xa;（布局容器）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="90" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="tasks" value="/dashboard/tasks&#xa;TaskManagement.vue&#xa;（任务管理）" style="swimlane;startSize=25;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="task_detail" value="创建/编辑任务&#xa;分配学生&#xa;状态流转" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="tasks">
+          <mxGeometry x="10" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="evidences" value="/dashboard/evidences&#xa;EvidenceManagement.vue&#xa;（证据管理）" style="swimlane;startSize=25;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="290" y="200" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ev_detail" value="文本/文件提交&#xa;AI分析按钮&#xa;反馈查看" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="evidences">
+          <mxGeometry x="10" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="results" value="/dashboard/results&#xa;ResultManagement.vue&#xa;（结果管理）" style="swimlane;startSize=25;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="540" y="200" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="res_detail" value="推理结果列表&#xa;维度得分卡片&#xa;雷达图预览" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="results">
+          <mxGeometry x="10" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="reports" value="/dashboard/reports&#xa;ReportManagement.vue&#xa;（报告管理）" style="swimlane;startSize=25;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="790" y="200" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="rep_detail" value="综合报告弹窗&#xa;雷达图/柱状图/饼图&#xa;班级对比/改进建议" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="reports">
+          <mxGeometry x="10" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="root" target="login">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="root" target="dashboard">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="dashboard" target="tasks">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="dashboard" target="evidences">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="dashboard" target="results">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="dashboard" target="reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="role_note" value="教师端：tasks / results / reports&#xa;学生端：evidences / results / reports" style="rounded=1;whiteSpace=wrap;html=1;fontSize=8;fillColor=#f5f5f5;strokeColor=#cccccc;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="160" width="180" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

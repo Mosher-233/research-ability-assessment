@@ -1,5 +1,161 @@
 # 更新日志
 
+## 2026-05-23
+
+### 测试基础设施完善
+
+- **新增 DOCX 提取器单元测试** (`pkg/extractor/docx_test.go`)
+  - 7 类质量等级单文件测试 (A-G)
+  - 81 文件全量批量测试 (100% 通过)
+  - ExtractorChain 混合格式测试 (DOCX + PDF)
+  - Benchmark 测试 (单文件 + 小文件)
+- **新增 Agent 单元测试** (`internal/agent/evidence_agent_test.go`)
+  - PreprocessEvidence 6 项 (空格/换行/截断/中文保留等)
+  - classifyWithKeywords 7 项 (文献检索/实验设计/数据分析/批判/创新/空文本/无关文本)
+  - assessEvidenceWithRules 4 项 (高质量/低质量/中等/可信度区间)
+  - ClassifyEvidence/ExtractKBMInfo 降级路径验证
+  - KBM 关键词覆盖完整性和无重叠校验
+  - buildRationale/calcCredibility 单元测试
+  - **共 26 项测试，全部通过**
+- **新增 LLM Client Mock 测试** (`internal/llm/client_test.go`)
+  - HTTP Mock Server 驱动的 8 项测试
+  - 覆盖: 成功响应/HTTP错误/空Choices/无API Key/未配置环境变量/非法JSON/多Choices
+- **CI 自动测试工作流** (`.github/workflows/test.yml`)
+  - extractor-tests: DOCX + PDF 提取 + Benchmark
+  - unit-tests: 全项目短测试 (`go test -short ./...`)
+  - llm-batch-test: LLM 采样测试 (main 分支 push 触发)
+
+### PDF 提取验证
+
+- **108/108 PDF 文件 100% 提取成功**
+  - 字符数范围: 196-1,721, 平均 446
+  - 覆盖 A-H 八个质量等级 + 3 个研究主题
+  - 并发提取测试通过 (19 项测试全通过)
+
+### LLM 批量分类验证
+
+- **新增批量分类工具** `scripts/batch_llm_classify.go`
+  - 支持并发 Worker、采样模式、可配置路径
+  - 189 文件 (81 DOCX + 108 PDF) 全量测试
+  - 输出：KBM 分布/等级分组/可信度梯度/异常检测详情
+- **全量测试结果**：
+  - 189/189 成功 (100%), 耗时 6m23s, 平均 API 响应 2.03s
+  - 异常检测率 98% (49/50), 等级±1以内率 100%
+  - 高估率 0% (LLM 评级保守), 可信度 A=87%→H=8% 单调递减
+
+### 论文完善
+
+- **第五章全面重写**: 新增文件提取验证、LLM vs 关键词全量对比、异常检测案例
+- **摘要更新** (中/英文): 实验规模从 5 学生 35 证据扩展为两层次验证
+- **全文审查**: 修复 12 个跨章节不一致 (LLM 优先策略对齐、虚假引用移除、重复文本纠正)
+- **新增 3 张图表**: fig5-4 (LLM vs 关键词对比)、fig5-5 (异常检测)、fig5-6 (可信度梯度)
+- **图片清理**: 统一 21 张 PNG 导出，移除重复 .drawio.png 文件
+
+### README 更新
+
+- Go 版本更新至 1.24
+- 新增功能特性 (异常检测、多格式提取、离线演示)
+- 新增测试章节 (运行方式、覆盖矩阵、测试数据说明)
+- 项目结构补充 (extractor、scripts、testdata、CI、papers)
+
+---
+
+## 2026-05-05
+
+### 核心架构优化：LLM 融入主流评估管线
+
+#### 文件解析能力扩展（P0）
+- **新增 `pkg/extractor/` 包**：统一文件内容提取接口
+  - `extractor.go`：`ContentExtractor` 接口与 `ExtractorChain` 链式提取器
+  - `pdf.go`：基于 `github.com/ledongthuc/pdf` 的 PDF 文本提取
+  - `docx.go`：基于 `archive/zip` + `encoding/xml` 的 DOCX 文本提取（零依赖）
+- **证据上传支持所有常见学术格式**：PDF、DOCX、TXT、MD
+- **证据模型扩展**：新增 `SourceType`、`ExtractionMetadata`、`ReviewedBy`、`ReviewedAt` 字段
+
+#### LLM 融入主要 Agent 管线（P0/P1）
+- **InferenceAgent 重写**：LLM 作为主推理路径，规则引擎为降级方案
+  - 新增 `NewInferenceAgentWithLLM()` 构造函数
+  - 引入完整 Rubrics（评分量规）体系，每个维度五级标准
+  - LLM 响应包含 `evidence_quotes`（证据原文引用）
+  - 自动从推理结果提取并生成 `EvidenceCitation` 记录
+- **EvidenceAgent 重写**：LLM 优先分类与评估
+  - 新增 `classifyWithLLM()` 和 `extractKBMWithLLM()` 方法
+  - 保留关键词匹配 `classifyWithKeywords()` 作为降级
+- **ControlUnit**：评估后自动保存引用记录到数据库
+
+#### LLM 上下文丰富与解析鲁棒性（P1）
+- **`inference_service.go`**：
+  - `buildEvidenceContext()` 按维度分组展示证据，包含完整元数据
+  - `parseLLMResponse()` 支持 markdown 代码块提取，添加重试机制（最多2次）
+  - 新增 `extractJSON()` 通用 JSON 提取函数，按括号深度匹配
+- **`feedback_agent.go`**：
+  - LLM 反馈 prompt 包含评估推理的详细上下文
+  - `parseLLMFeedbackResponse()` 使用统一 JSON 提取逻辑
+  - 规则反馈按分数区间细分，在每个等级内显示当前得分
+
+#### 证据引用与可溯源性（P1/P2）
+- **新增 `internal/models/citation.go`**：`EvidenceCitation` 模型
+  - 追踪结果ID → 维度ID → 证据ID → 引用原文段落的完整链路
+- **新增 `ResultRepo` 引用方法**：`CreateCitation`、`CreateCitations`、`GetCitationsByResultID`、`GetCitationsByResultIDs`
+- **`StorageUnit` 新增 `StoreCitations()` 方法**
+- **结果查询 API 自动附带 citations 数据**
+
+#### LLM 客户端增强
+- **`llm/client.go`**：新增 `ResponseFormat` 支持，可约束 LLM 输出 JSON 格式
+
+---
+
+## 2026-04-26
+
+### 文档体系维护
+
+#### README.md 完善
+- **项目结构修正**：移除不存在的 `config.mysql.yaml`、`config.supabase.yaml` 引用，补充实际存在的 `scripts/`、`CHANGELOG.md`、`pkg/cache/` 目录
+- **技术栈补全**：添加 Redis（可选）、JWT 认证、TypeScript、Vite 4、Vue Router 4、ECharts 6
+- **快速开始优化**：将 `cp` 改为 `copy`（适配 Windows），新增第5步 `go run scripts/init_db.go` 测试数据初始化
+- **LLM 配置修正**：`max_tokens: 1000` → `2048`（与实际代码一致）
+- **文档索引补全**：添加 `demo_script.md`、`result_and_report_management.md`、`concurrent_testing_guide.md` 链接
+- **FAQ 扩展**：修正数据库支持说明，新增测试账号表格
+
+#### docs/demo_script.md 修正
+- **数据库修正**：PostgreSQL + Neo4j → MySQL + Neo4j
+- **登录凭证修正**：教师 `admin@example.com/password123` → `1@tea.com/123456`，学生 `student@example.com/password123` → `1@stu.com/123456`
+- **评估维度修正**：移除不存在的"学术写作能力"，保持4维度与实际代码一致
+- **LLM 引用修正**：OpenAI API / GPT-3.5-turbo → DeepSeek API / deepseek-chat
+
+#### docs/development_guide.md 修正
+- **技术栈修正**：PostgreSQL 14+ → MySQL 8.0+，Neo4j 5.0+ → 5.23+，OpenAI API → DeepSeek API
+- **架构图修正**：PostgreSQL → MySQL，OpenAI API → DeepSeek API
+- **目录结构修正**：移除不存在的 `io_unit.go`、`prompts.go`、`pkg/logger/`、`utils/jwt.go`、`utils/validator.go`；补充 `agent_handler.go`、`dimension.go`、`feedback.go`、`report.go`、`pkg/cache/redis.go`、`pkg/utils/id_generator.go`
+
+#### docs/deployment_guide.md 修正
+- **全篇数据库修正**：PostgreSQL 全面替换为 MySQL（版本号、端口、用户名密码、Docker Compose 示例）
+- **Neo4j 修正**：版本 5.0 → 5.23，默认密码 `neo4j` → `password123`
+- **LLM 修正**：OpenAI/GPT-3.5-turbo → DeepSeek/deepseek-chat
+- **配置文件路径修正**：`configs/config.yaml` → `configs/config.dev.yaml`
+- **Vite proxy 修正**：`rewrite` 逻辑与实际 `vite.config.ts` 保持一致
+- **简化日志配置**：移除不存在的 `logger` 配置项
+
+#### docs/user_manual.md 修正
+- **环境要求修正**：PostgreSQL 14+, Neo4j 5.0+ → MySQL 8.0+, Neo4j 5.23+
+- **系统架构修正**：PostgreSQL → MySQL
+- **评估维度修正**：移除"学术写作能力"
+
+#### docs/database_options.md 修正
+- **默认数据库**：PostgreSQL（默认）→ MySQL（默认，与 docker-compose.yml 一致）
+- **章节顺序重排**：MySQL → PostgreSQL → Supabase
+- **配置方式统一**：移除不存在的 `config.mysql.yaml`、`config.supabase.yaml` 引用，统一使用 `config.dev.yaml`
+- **Neo4j 密码修正**：`neo4jpassword` → `password123`
+- **快速开始完善**：添加 `.env` 配置和 `init_db.go` 步骤
+
+#### .gitignore 维护
+- **IDE 目录**：新增 `.trae/` 忽略规则（Trae IDE 技能/配置目录，类似 `.vscode/`、`.idea/`）
+- **测试覆盖率**：新增 `coverage/` 和 `*.coverprofile` 防御性规则
+- **Python 产物**：新增 `__pycache__/` 和 `*.py[cod]`（项目中存在 Python 脚本）
+- **Dump 文件**：新增 `*.dump` 防御性规则
+
+---
+
 ## 2026-03-15
 
 ### 核心问题修复与功能完善

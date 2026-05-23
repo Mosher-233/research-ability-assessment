@@ -7,9 +7,9 @@
 - **后端**：
   - 语言：Go 1.20+
   - 框架：Gin 1.9.0+
-  - 数据库：PostgreSQL 14+, Neo4j 5.0+
+  - 数据库：MySQL 8.0+, Neo4j 5.23+
   - 认证：JWT
-  - LLM集成：OpenAI API
+  - LLM集成：DeepSeek API
 
 - **前端**：
   - 框架：Vue 3
@@ -23,7 +23,7 @@
 ```
 ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
 │    前端应用     │◄──────┤    后端API      │◄──────┤    数据库       │
-│  Vue 3 + TS    │       │  Go + Gin       │       │ PostgreSQL +   │
+│  Vue 3 + TS    │       │  Go + Gin       │       │ MySQL +       │
 │  Element Plus  │       │  JWT认证        │       │ Neo4j          │
 └─────────────────┘       └─────────────────┘       └─────────────────┘
                                │
@@ -38,7 +38,7 @@
                                ▼
                       ┌─────────────────┐
                       │    LLM服务      │
-                      │  OpenAI API     │
+                      │  DeepSeek API   │
                       └─────────────────┘
 ```
 
@@ -59,33 +59,35 @@ research-ability-assessment/
 │   │   ├── evidence_agent.go  # 证据收集Agent
 │   │   ├── feedback_agent.go  # 反馈生成Agent
 │   │   ├── inference_agent.go # 能力推理Agent
-│   │   ├── io_unit.go         # IO单元
 │   │   ├── logic_unit.go      # 逻辑单元
 │   │   └── storage_unit.go    # 存储单元
 │   ├── config/           # 配置管理
 │   │   └── config.go     # 配置加载和管理
 │   ├── handler/          # API处理器
+│   │   ├── agent_handler.go     # Agent评估API
 │   │   ├── auth_handler.go     # 认证相关API
 │   │   ├── evidence_handler.go # 证据相关API
 │   │   ├── result_handler.go   # 结果相关API
 │   │   └── task_handler.go     # 任务相关API
 │   ├── llm/              # 大语言模型集成
 │   │   ├── client.go     # LLM客户端
-│   │   ├── parser.go     # 结果解析器
-│   │   └── prompts.go    # 提示词模板
+│   │   └── parser.go     # 结果解析器
 │   ├── middleware/       # 中间件
 │   │   ├── auth.go       # 认证中间件
 │   │   ├── cors.go       # CORS中间件
 │   │   └── logging.go    # 日志中间件
 │   ├── models/           # 数据模型
+│   │   ├── dimension.go  # 评估维度
 │   │   ├── evidence.go   # 证据模型
+│   │   ├── feedback.go   # 反馈模型
+│   │   ├── report.go     # 报告模型
 │   │   ├── result.go     # 结果模型
 │   │   ├── task.go       # 任务模型
 │   │   └── user.go       # 用户模型
 │   ├── repository/       # 数据访问层
 │   │   ├── neo4j/        # Neo4j仓库
 │   │   │   └── graph_repo.go  # 图数据库操作
-│   │   └── postgres/     # PostgreSQL仓库
+│   │   └── postgres/     # 数据仓库
 │   │       ├── result_repo.go # 结果数据操作
 │   │       ├── task_repo.go   # 任务数据操作
 │   │       └── user_repo.go   # 用户数据操作
@@ -96,11 +98,10 @@ research-ability-assessment/
 │       ├── report_service.go   # 报告服务
 │       └── task_service.go     # 任务服务
 ├── pkg/                  # 公共包
-│   ├── logger/           # 日志工具
-│   │   └── logger.go     # 日志配置
+│   ├── cache/            # 缓存工具
+│   │   └── redis.go      # Redis客户端
 │   └── utils/            # 工具函数
-│       ├── jwt.go        # JWT工具
-│       └── validator.go  # 数据验证
+│       └── id_generator.go # ID生成器
 ├── go.mod                # Go模块文件
 └── go.sum                # 依赖版本锁定
 ```
@@ -182,9 +183,15 @@ research-ability-assessment/frontend/
 
 推理模块负责使用AI Agent对学生的研究能力进行评估。AI Agent会分析学生提交的证据，评估学生的研究能力维度。
 
+**LLM 主导模式（当前主流）**：
+- 推理主链路（ControlUnit → InferenceAgent）使用 LLM 进行语义级评估
+- LLM 对照预定义的 Rubrics（五级评分量规）对每个维度进行评分
+- 每次评分要求 LLM 引用证据原文中的具体段落作为判据
+- 规则引擎（LogicUnit）仅在 LLM 不可用时作为降级方案
+
 **主要功能**：
-- 证据收集和分析
-- 能力维度评估
+- 证据收集和分析（支持 PDF/DOCX/TXT/Markdown 文件内容提取）
+- 能力维度评估（含证据引用溯源）
 - 推理结果生成
 
 #### 3.1.5 报告模块
@@ -536,16 +543,17 @@ AI Agent采用模块化设计，由以下组件组成：
 
 ### 6.2 工作流程
 
-1. **证据收集**：收集学生提交的研究证据
-2. **证据分析**：分析证据内容，提取关键信息
-3. **能力评估**：根据证据评估学生的研究能力维度
-4. **结果生成**：生成详细的评估结果和推理过程
-5. **反馈生成**：生成改进建议和个性化反馈
-6. **报告生成**：生成完整的研究能力评价报告
+1. **文件解析**：支持 PDF、DOCX、TXT、Markdown 等格式的文本提取（通过 `pkg/extractor` 包）
+2. **证据收集**：收集学生提交的研究证据
+3. **证据分析**：LLM 分析证据内容，提取关键信息，匹配 KBM 分类
+4. **能力评估**：LLM 根据 Rubrics 量规评估学生的研究能力维度，引用证据原文作为判据
+5. **结果生成**：生成详细的评估结果和推理过程，自动创建证据引用记录
+6. **反馈生成**：LLM 基于评估结果和证据内容生成个性化改进建议
+7. **报告生成**：生成完整的研究能力评价报告
 
 ### 6.3 LLM集成
 
-系统集成了OpenAI API，使用GPT-3.5-turbo模型进行能力评估和反馈生成。通过精心设计的提示词模板，引导LLM生成准确、客观的评估结果。
+系统集成了 DeepSeek API，使用 deepseek-chat 模型进行能力评估和反馈生成。通过精心设计的提示词模板，引导LLM生成准确、客观的评估结果。
 
 ## 7. 系统部署
 
@@ -637,7 +645,7 @@ AI Agent采用模块化设计，由以下组件组成：
 
 **症状**：评估过程失败，提示LLM调用错误
 **解决方案**：
-- 检查OpenAI API密钥是否正确
+- 检查 DeepSeek API 密钥是否正确
 - 检查网络连接是否正常
 - 检查LLM请求参数是否正确
 

@@ -5,8 +5,8 @@
 ### 1.1 后端环境
 
 - **Go**：1.20 或更高版本
-- **PostgreSQL**：14.0 或更高版本
-- **Neo4j**：5.0 或更高版本
+- **MySQL**：8.0 或更高版本
+- **Neo4j**：5.23 或更高版本
 - **Redis**：6.0 或更高版本（可选，用于缓存）
 
 ### 1.2 前端环境
@@ -33,55 +33,46 @@
 
 #### 2.1.2 配置数据库
 
-1. 启动 PostgreSQL 服务
-2. 创建数据库：
+1. 启动 MySQL 服务（或使用 Docker Compose）
+2. 创建数据库（docker-compose 会自动创建）：
    ```sql
-   CREATE DATABASE research_assessment;
+   CREATE DATABASE research_assessment CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
-3. 创建用户并授权：
-   ```sql
-   CREATE USER postgres WITH PASSWORD 'postgres';
-   GRANT ALL PRIVILEGES ON DATABASE research_assessment TO postgres;
-   ```
+3. 用户和权限已由 docker-compose 自动配置
 
 #### 2.1.3 配置 Neo4j
 
 1. 启动 Neo4j 服务
 2. 访问 Neo4j 浏览器（默认地址：http://localhost:7474）
-3. 登录并修改默认密码（默认用户名：neo4j，默认密码：neo4j）
+3. 登录（默认用户名：neo4j，默认密码：password123）
 
 #### 2.1.4 配置系统
 
-1. 复制配置文件：
-   ```bash
-   cp configs/config.dev.yaml configs/config.yaml
+1. 复制环境变量文件：
+   ```powershell
+   copy .env.example .env
    ```
 
-2. 编辑配置文件 `configs/config.yaml`，设置数据库连接信息：
+2. 编辑配置文件 `configs/config.dev.yaml`，设置数据库连接信息：
    ```yaml
    database:
+     type: mysql
      host: localhost
-     port: 5432
-     user: postgres
-     password: postgres
+     port: 3306
+     user: mysqluser
+     password: mysqlpassword
      dbname: research_assessment
      sslmode: disable
 
    neo4j:
      uri: bolt://localhost:7687
      username: neo4j
-     password: <your-neo4j-password>
+     password: password123
    ```
 
-3. 配置 LLM API 密钥（可选）：
-   ```yaml
-   llm:
-     provider: openai
-     api_key: <your-openai-api-key>
-     base_url: https://api.openai.com/v1
-     model: gpt-3.5-turbo
-     max_tokens: 1000
-     temperature: 0.7
+3. 编辑 `.env`，配置 LLM API 密钥：
+   ```env
+   DEEPSEEK_API_KEY=你的DeepSeek API Key
    ```
 
 #### 2.1.5 启动后端服务
@@ -123,7 +114,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        rewrite: (path) => path
       }
     }
   }
@@ -151,8 +142,8 @@ go build -o server cmd/server/main.go
 #### 3.1.2 配置生产环境
 
 1. 创建生产环境配置文件：
-   ```bash
-   cp configs/config.dev.yaml configs/config.prod.yaml
+   ```powershell
+   copy configs\config.dev.yaml configs\config.prod.yaml
    ```
 
 2. 编辑配置文件 `configs/config.prod.yaml`，设置生产环境的数据库连接信息和其他配置。
@@ -275,21 +266,22 @@ docker build -t research-ability-assessment-frontend ./frontend
 version: '3.8'
 
 services:
-  db:
-    image: postgres:14-alpine
+  mysql:
+    image: mysql:8.0
     environment:
-      POSTGRES_DB: research_assessment
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: research_assessment
+      MYSQL_USER: mysqluser
+      MYSQL_PASSWORD: mysqlpassword
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     ports:
-      - "5432:5432"
+      - "3306:3306"
 
   neo4j:
-    image: neo4j:5.0
+    image: neo4j:5.23-community
     environment:
-      NEO4J_AUTH: neo4j/password
+      NEO4J_AUTH: neo4j/password123
     volumes:
       - neo4j_data:/data
     ports:
@@ -299,9 +291,9 @@ services:
   backend:
     build: .
     environment:
-      - CONFIG_PATH=configs/config.prod.yaml
+      - APP_ENV=prod
     depends_on:
-      - db
+      - mysql
       - neo4j
     ports:
       - "8080:8080"
@@ -314,7 +306,7 @@ services:
       - "80:80"
 
 volumes:
-  postgres_data:
+  mysql_data:
   neo4j_data:
 ```
 
@@ -347,13 +339,7 @@ docker-compose up -d
 
 ### 6.1 日志管理
 
-后端服务的日志默认输出到控制台，可通过配置文件设置日志文件路径：
-
-```yaml
-logger:
-  level: info
-  file: logs/app.log
-```
+后端服务的日志默认输出到控制台。
 
 ### 6.2 健康检查
 
@@ -407,7 +393,7 @@ scrape_configs:
 
 **症状**：评估过程失败，提示 LLM 调用错误
 **解决方案**：
-- 检查 OpenAI API 密钥是否正确
+- 检查 DeepSeek API 密钥是否正确
 - 检查网络连接是否正常
 - 检查 LLM 请求参数是否正确
 

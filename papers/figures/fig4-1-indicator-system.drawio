@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="29.7.9">
+  <diagram name="评价指标体系">
+    <mxGraphModel dx="1100" dy="400" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="top" value="大学生研究能力评价指标体系（10项KBM）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6c8ebf;strokeColor=#6c8ebf;fontColor=#ffffff;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="20" width="360" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d1" value="维度一：文献检索与综述能力" style="swimlane;startSize=25;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="25" y="100" width="250" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="k1" value="KBM-1: 文献检索策略" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d1">
+          <mxGeometry x="15" y="35" width="220" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="k2" value="KBM-2: 文献综述质量" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d1">
+          <mxGeometry x="15" y="80" width="220" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="k3" value="KBM-3: 文献批判性分析" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d1">
+          <mxGeometry x="15" y="125" width="220" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d2" value="维度二：研究设计与实验能力" style="swimlane;startSize=25;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="290" y="100" width="250" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="k4" value="KBM-4: 实验方案合理性" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d2">
+          <mxGeometry x="15" y="35" width="220" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="k5" value="KBM-5: 变量控制" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d2">
+          <mxGeometry x="15" y="80" width="220" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="k6" value="KBM-6: 实验实施质量" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d2">
+          <mxGeometry x="15" y="125" width="220" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d3" value="维度三：数据分析与解释能力" style="swimlane;startSize=25;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="555" y="100" width="250" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="k7" value="KBM-7: 数据分析方法选择" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d3">
+          <mxGeometry x="15" y="35" width="220" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="k8" value="KBM-8: 结果解释准确性" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d3">
+          <mxGeometry x="15" y="80" width="220" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="d4" value="维度四：批判性思维与创新能力" style="swimlane;startSize=25;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="820" y="100" width="260" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="k9" value="KBM-9: 问题提出新颖性" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d4">
+          <mxGeometry x="15" y="35" width="230" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="k10" value="KBM-10: 解决方案原创性" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="d4">
+          <mxGeometry x="15" y="80" width="230" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="note" value="注：设计阶段规划12项KBM，其中KBM-9(可视化与呈现)和KBM-12(反思与改进)待后续扩展纳入实现。" style="text;fontSize=9;fontFamily=SimSun;align=center;fillColor=#FFF9C4;" vertex="1" parent="1">
+          <mxGeometry x="250" y="320" width="600" height="25" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
