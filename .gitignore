@@ -79,3 +79,4 @@ testdata/
 
 # Internal analysis doc
 docs/项目分析报告.md
+docs/database_migration_guide.md
