@@ -11,6 +11,7 @@ import (
 
 const testdataWordsDir = "../../testdata/words"
 
+
 func TestDOCXExtractor_SupportedFormats(t *testing.T) {
 	e := NewDOCXExtractor()
 	formats := e.SupportedFormats()
@@ -26,6 +27,7 @@ func TestDOCXExtractor_Extract_NonExistentFile(t *testing.T) {
 }
 
 func TestDOCXExtractor_Extract_QualityA(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	e := NewDOCXExtractor()
 	path := filepath.Join(testdataWordsDir, "A_优秀_S001_张明_语音情感识别_R001.docx")
 	content, err := e.Extract(path)
@@ -36,6 +38,7 @@ func TestDOCXExtractor_Extract_QualityA(t *testing.T) {
 }
 
 func TestDOCXExtractor_Extract_QualityD(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	e := NewDOCXExtractor()
 	path := filepath.Join(testdataWordsDir, "D_不合格_S013_马超_联邦学习推荐_R013.docx")
 	content, err := e.Extract(path)
@@ -45,6 +48,7 @@ func TestDOCXExtractor_Extract_QualityD(t *testing.T) {
 }
 
 func TestDOCXExtractor_Extract_QualityE_OffTopic(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	e := NewDOCXExtractor()
 	path := filepath.Join(testdataWordsDir, "E_答非所问_S016_徐婷_语音情感识别_R016.docx")
 	content, err := e.Extract(path)
@@ -54,6 +58,7 @@ func TestDOCXExtractor_Extract_QualityE_OffTopic(t *testing.T) {
 }
 
 func TestDOCXExtractor_Extract_QualityF_Empty(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	e := NewDOCXExtractor()
 	path := filepath.Join(testdataWordsDir, "F_内容空洞_S018_曹雪_GNN影响力分析_R018.docx")
 	content, err := e.Extract(path)
@@ -63,6 +68,7 @@ func TestDOCXExtractor_Extract_QualityF_Empty(t *testing.T) {
 }
 
 func TestDOCXExtractor_Extract_QualityG_Malformed(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	e := NewDOCXExtractor()
 	path := filepath.Join(testdataWordsDir, "G_格式混乱_S020_潘丽_联邦学习推荐_R020.docx")
 	content, err := e.Extract(path)
@@ -72,6 +78,7 @@ func TestDOCXExtractor_Extract_QualityG_Malformed(t *testing.T) {
 }
 
 func TestDOCXExtractor_Extract_MixedQualityClasses(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	samples := map[string]string{
 		"A-优秀":   "A_优秀_S001_张明_语音情感识别_R001.docx",
 		"B-良好":   "B_良好_S004_赵强_语音情感识别_R004.docx",
@@ -94,6 +101,7 @@ func TestDOCXExtractor_Extract_MixedQualityClasses(t *testing.T) {
 }
 
 func TestDOCXExtractor_Extract_AllFiles(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	if testing.Short() {
 		t.Skip("skipping batch test in short mode")
 	}
@@ -137,6 +145,7 @@ func TestDOCXExtractor_Extract_AllFiles(t *testing.T) {
 }
 
 func TestExtractorChain_Extract_DOCX(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	chain := NewExtractorChain()
 	path := filepath.Join(testdataWordsDir, "B_良好_S005_刘洋_联邦学习推荐_R005.docx")
 	result := chain.Extract(path)
@@ -147,6 +156,7 @@ func TestExtractorChain_Extract_DOCX(t *testing.T) {
 }
 
 func TestExtractorChain_AllDOCXs(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	if testing.Short() {
 		t.Skip("skipping chain batch test in short mode")
 	}
@@ -168,6 +178,7 @@ func TestExtractorChain_AllDOCXs(t *testing.T) {
 }
 
 func TestExtractorChain_MixedFormats(t *testing.T) {
+	skipIfNoDir(t, testdataWordsDir)
 	chain := NewExtractorChain()
 
 	// DOCX

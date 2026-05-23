@@ -13,6 +13,7 @@ import (
 
 const testdataDir = "../../testdata/pdfs"
 
+
 // ---------------------------------------------------------------------------
 // Unit: cleanPDFText
 // ---------------------------------------------------------------------------
@@ -107,6 +108,7 @@ func TestPDFExtractor_Extract_NonPDFFile(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPDFExtractor_Extract_SpeechEmotion(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	e := NewPDFExtractor()
 	path := filepath.Join(testdataDir, "A_S001_张明化_语音情感识别_R001.pdf")
 	content, err := e.Extract(path)
@@ -116,6 +118,7 @@ func TestPDFExtractor_Extract_SpeechEmotion(t *testing.T) {
 }
 
 func TestPDFExtractor_Extract_FederatedLearning(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	e := NewPDFExtractor()
 	path := filepath.Join(testdataDir, "A_S002_学生002_联邦学习推荐_R002.pdf")
 	content, err := e.Extract(path)
@@ -125,6 +128,7 @@ func TestPDFExtractor_Extract_FederatedLearning(t *testing.T) {
 }
 
 func TestPDFExtractor_Extract_GNNInfluence(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	e := NewPDFExtractor()
 	path := filepath.Join(testdataDir, "A_S003_学生003_GNN影响力分析_R003.pdf")
 	content, err := e.Extract(path)
@@ -134,6 +138,7 @@ func TestPDFExtractor_Extract_GNNInfluence(t *testing.T) {
 }
 
 func TestPDFExtractor_Extract_ClassH(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	e := NewPDFExtractor()
 	path := filepath.Join(testdataDir, "H_S092_学生092_联邦学习推荐_R092.pdf")
 	content, err := e.Extract(path)
@@ -143,6 +148,7 @@ func TestPDFExtractor_Extract_ClassH(t *testing.T) {
 }
 
 func TestPDFExtractor_Extract_LargeFile(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	// A_S001 is 155KB — one of the larger files
 	e := NewPDFExtractor()
 	path := filepath.Join(testdataDir, "A_S001_张明化_语音情感识别_R001.pdf")
@@ -157,6 +163,7 @@ func TestPDFExtractor_Extract_LargeFile(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPDFExtractor_Extract_AllFiles(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	if testing.Short() {
 		t.Skip("skipping batch test in short mode")
 	}
@@ -204,6 +211,7 @@ func TestPDFExtractor_Extract_AllFiles(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPDFExtractor_Extract_Concurrent(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	if testing.Short() {
 		t.Skip("skipping concurrent test in short mode")
 	}
@@ -252,6 +260,7 @@ func TestPDFExtractor_Extract_Concurrent(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestExtractorChain_Extract_PDF(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	chain := NewExtractorChain()
 	path := filepath.Join(testdataDir, "B_S013_学生013_语音情感识别_R013.pdf")
 	result := chain.Extract(path)
@@ -262,6 +271,7 @@ func TestExtractorChain_Extract_PDF(t *testing.T) {
 }
 
 func TestExtractorChain_Extract_PDFWithoutExtension(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	// This tests the fallback path — not easily testable without file manipulation,
 	// but we verify the chain works correctly with the given extension.
 	chain := NewExtractorChain()
@@ -285,6 +295,7 @@ func TestExtractorChain_GetSupportedFormats(t *testing.T) {
 }
 
 func TestExtractorChain_AllPDFs(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	if testing.Short() {
 		t.Skip("skipping chain batch test in short mode")
 	}
