@@ -8,8 +8,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"research-ability-assessment/internal/models"
-	"research-ability-assessment/pkg/utils"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/pkg/utils"
 	"strings"
 	"time"
 
@@ -454,4 +454,14 @@ func (s *ReportService) GetReportsByStudentID(ctx context.Context, studentID str
 		return nil, fmt.Errorf("result repo does not support GetReportsByStudentID")
 	}
 	return repo.GetReportsByStudentID(ctx, studentID)
+}
+
+func (s *ReportService) GetReportsByTeacherID(ctx context.Context, teacherID string) ([]models.Report, error) {
+	repo, ok := s.resultRepo.(interface {
+		GetReportsByTeacherID(ctx context.Context, teacherID string) ([]models.Report, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("result repo does not support GetReportsByTeacherID")
+	}
+	return repo.GetReportsByTeacherID(ctx, teacherID)
 }

@@ -2,9 +2,9 @@ package agent
 
 import (
 	"context"
-	"research-ability-assessment/internal/models"
-	"research-ability-assessment/internal/repository/neo4j"
-	"research-ability-assessment/internal/repository/postgres"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/internal/repository/neo4j"
+	"github.com/Mosher-233/research-ability-assessment/internal/repository/postgres"
 )
 
 type StorageUnit struct {
@@ -35,4 +35,21 @@ func (s *StorageUnit) UpdateKnowledgeGraph(ctx context.Context, studentID string
 
 func (s *StorageUnit) GetStudentScores(ctx context.Context, studentID string) (map[string]float64, error) {
 	return s.graphRepo.GetStudentScores(studentID)
+}
+
+func (s *StorageUnit) StoreCitations(ctx context.Context, resultID string, citations []CitationInfo) error {
+	for _, c := range citations {
+		citation := &models.EvidenceCitation{
+			ID:             resultID + "_" + c.DimensionID + "_" + c.EvidenceID,
+			ResultID:       resultID,
+			DimensionID:    c.DimensionID,
+			EvidenceID:     c.EvidenceID,
+			ExcerptText:    c.ExcerptText,
+			RelevanceScore: c.RelevanceScore,
+		}
+		if err := s.resultRepo.CreateCitation(ctx, citation); err != nil {
+			return err
+		}
+	}
+	return nil
 }

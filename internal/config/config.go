@@ -82,8 +82,17 @@ func LoadConfig(configPath string) (*Config, error) {
 
 func expandEnvVar(s string) string {
 	if strings.HasPrefix(s, "${") && strings.HasSuffix(s, "}") {
-		key := s[2 : len(s)-1]
-		if val := os.Getenv(key); val != "" {
+		inner := s[2 : len(s)-1]
+		// Support ${VAR} and ${VAR:-default} syntax
+		if idx := strings.Index(inner, ":-"); idx >= 0 {
+			key := inner[:idx]
+			def := inner[idx+2:]
+			if val := os.Getenv(key); val != "" {
+				return val
+			}
+			return def
+		}
+		if val := os.Getenv(inner); val != "" {
 			return val
 		}
 	}

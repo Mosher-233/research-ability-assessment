@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"research-ability-assessment/internal/agent"
-	"research-ability-assessment/internal/config"
-	"research-ability-assessment/internal/handler"
-	"research-ability-assessment/internal/llm"
-	"research-ability-assessment/internal/middleware"
-	"research-ability-assessment/internal/models"
-	repoNeo4j "research-ability-assessment/internal/repository/neo4j"
-	repoPostgres "research-ability-assessment/internal/repository/postgres"
-	"research-ability-assessment/internal/service"
+	"github.com/Mosher-233/research-ability-assessment/internal/agent"
+	"github.com/Mosher-233/research-ability-assessment/internal/config"
+	"github.com/Mosher-233/research-ability-assessment/internal/handler"
+	"github.com/Mosher-233/research-ability-assessment/internal/llm"
+	"github.com/Mosher-233/research-ability-assessment/internal/middleware"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	repoNeo4j "github.com/Mosher-233/research-ability-assessment/internal/repository/neo4j"
+	repoPostgres "github.com/Mosher-233/research-ability-assessment/internal/repository/postgres"
+	"github.com/Mosher-233/research-ability-assessment/internal/service"
+	"github.com/Mosher-233/research-ability-assessment/pkg/cache"
+	"github.com/Mosher-233/research-ability-assessment/pkg/extractor"
 
 	"github.com/gin-gonic/gin"
 	neo4jdriver "github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -78,30 +80,38 @@ func main() {
 	taskService := service.NewTaskService(taskRepo, userRepo)
 	inferenceService := service.NewInferenceServiceWithLLM(resultRepo, evidenceService, llmClient)
 	reportService := service.NewReportService(inferenceService, resultRepo)
+
+	redisCache, err := cache.NewRedisCache(cfg.Redis.Host, cfg.Redis.Port, cfg.Redis.Password, cfg.Redis.DB)
+	if err != nil {
+		log.Printf("Redis缓存初始化失败: %v，将跳过缓存功能", err)
+	} else if redisCache.IsAvailable() {
+		inferenceService.SetCache(redisCache)
+	}
 	log.Println("服务初始化成功")
 
 	// 初始化Agent
 	log.Println("开始初始化Agent...")
-	ioUnit := agent.NewIOUnit(taskService, evidenceService)
-	evidenceAgent := agent.NewEvidenceAgent(evidenceService, ioUnit)
+	evidenceAgent := agent.NewEvidenceAgentWithLLM(evidenceService, llmClient)
 	logicUnit := agent.NewLogicUnit()
 	storageUnit := agent.NewStorageUnit(resultRepo, graphRepo)
-	inferenceAgent := agent.NewInferenceAgent(evidenceAgent, logicUnit, inferenceService)
-	controlUnit := agent.NewControlUnit(taskService, evidenceService, inferenceService, inferenceAgent, storageUnit)
-	_ = controlUnit
+	inferenceAgent := agent.NewInferenceAgentWithLLM(evidenceAgent, logicUnit, llmClient)
+	feedbackAgent := agent.NewFeedbackAgent(llmClient)
+	controlUnit := agent.NewControlUnit(taskService, inferenceService, inferenceAgent, feedbackAgent, storageUnit)
 	log.Println("Agent初始化成功")
 
 	// 初始化处理器
 	log.Println("开始初始化处理器...")
+	extractorChain := extractor.NewExtractorChain()
 	authHandler := handler.NewAuthHandler(authService)
 	taskHandler := handler.NewTaskHandler(taskService)
-	evidenceHandler := handler.NewEvidenceHandler(evidenceService)
+	evidenceHandler := handler.NewEvidenceHandler(evidenceService, evidenceAgent, extractorChain)
 	resultHandler := handler.NewResultHandler(inferenceService, reportService, resultRepo, taskService, userRepo, taskRepo)
+	agentHandler := handler.NewAgentHandler(controlUnit, inferenceService, reportService)
 	log.Println("处理器初始化成功")
 
 	// 初始化路由
 	log.Println("开始初始化路由...")
-	r := setupRouter(authService, authHandler, taskHandler, evidenceHandler, resultHandler, llmClient)
+	r := setupRouter(authService, authHandler, taskHandler, evidenceHandler, resultHandler, agentHandler, graphRepo, llmClient)
 	log.Println("路由初始化成功")
 
 	// 启动服务器
@@ -109,6 +119,9 @@ func main() {
 	log.Printf("服务器启动在 %s", serverAddr)
 	if err := r.Run(serverAddr); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
+	}
+	if redisCache != nil {
+		redisCache.Close()
 	}
 }
 
@@ -168,10 +181,11 @@ func migrateDatabase(db *gorm.DB) {
 		&models.Feedback{},
 		&models.InferenceResult{},
 		&models.Report{},
+		&models.EvidenceCitation{},
 	)
 }
 
-func setupRouter(authService *service.AuthService, authHandler *handler.AuthHandler, taskHandler *handler.TaskHandler, evidenceHandler *handler.EvidenceHandler, resultHandler *handler.ResultHandler, llmClient *llm.Client) *gin.Engine {
+func setupRouter(authService *service.AuthService, authHandler *handler.AuthHandler, taskHandler *handler.TaskHandler, evidenceHandler *handler.EvidenceHandler, resultHandler *handler.ResultHandler, agentHandler *handler.AgentHandler, graphRepo *repoNeo4j.GraphRepo, llmClient *llm.Client) *gin.Engine {
 	r := gin.Default()
 
 	// 中间件
@@ -293,6 +307,49 @@ func setupRouter(authService *service.AuthService, authHandler *handler.AuthHand
 			report.POST("/generate", resultHandler.GenerateReport)
 			report.GET("", resultHandler.GetReports)
 			report.GET("/student", resultHandler.GetStudentReports)
+		}
+
+		// Agent评估路由
+		agent := protected.Group("/agent")
+		{
+			agent.POST("/evaluate", agentHandler.EvaluateStudent)
+			agent.POST("/evaluate/all", agentHandler.EvaluateAllStudents)
+			agent.GET("/evaluate/status", agentHandler.GetEvaluationStatus)
+			agent.POST("/feedback", agentHandler.GenerateFeedback)
+		}
+
+		// 知识图谱路由
+		graph := protected.Group("/graph")
+		{
+			graph.GET("/student/:student_id", func(c *gin.Context) {
+				studentID := c.Param("student_id")
+				scores, err := graphRepo.GetStudentScores(studentID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"code":    500,
+						"message": "获取图谱数据失败",
+						"data":    nil,
+					})
+					return
+				}
+				nodes := []gin.H{{"id": studentID, "label": "学生", "type": "student"}}
+				var edges []gin.H
+				for dim, score := range scores {
+					dimName := models.GetDimensionName(dim)
+					nodes = append(nodes, gin.H{"id": dim, "label": dimName, "type": "dimension"})
+					edges = append(edges, gin.H{
+						"source": studentID,
+						"target": dim,
+						"score":  score,
+						"label":  fmt.Sprintf("%.1f", score),
+					})
+				}
+				c.JSON(http.StatusOK, gin.H{
+					"code":    200,
+					"message": "获取图谱数据成功",
+					"data":    gin.H{"nodes": nodes, "edges": edges},
+				})
+			})
 		}
 	}
 

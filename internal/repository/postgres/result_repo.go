@@ -3,7 +3,7 @@ package postgres
 import (
 	"context"
 	"log"
-	"research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
 
 	"gorm.io/gorm"
 )
@@ -111,4 +111,59 @@ func (r *ResultRepo) GetAllReports(ctx context.Context) ([]models.Report, error)
 		return nil, err
 	}
 	return reports, nil
+}
+
+func (r *ResultRepo) GetInferenceResultsByTeacherID(ctx context.Context, teacherID string) ([]models.InferenceResult, error) {
+	var results []models.InferenceResult
+	if err := r.db.WithContext(ctx).
+		Joins("JOIN tasks ON inference_results.task_id = tasks.id").
+		Where("tasks.teacher_id = ?", teacherID).
+		Find(&results).Error; err != nil {
+		log.Printf("ResultRepo: 获取教师推理结果失败, TeacherID=%s, err=%v", teacherID, err)
+		return nil, err
+	}
+	log.Printf("ResultRepo: 获取教师推理结果成功, TeacherID=%s, 数量=%d", teacherID, len(results))
+	return results, nil
+}
+
+func (r *ResultRepo) GetReportsByTeacherID(ctx context.Context, teacherID string) ([]models.Report, error) {
+	var reports []models.Report
+	if err := r.db.WithContext(ctx).
+		Joins("JOIN tasks ON reports.task_id = tasks.id").
+		Where("tasks.teacher_id = ?", teacherID).
+		Find(&reports).Error; err != nil {
+		log.Printf("ResultRepo: 获取教师报告失败, TeacherID=%s, err=%v", teacherID, err)
+		return nil, err
+	}
+	log.Printf("ResultRepo: 获取教师报告成功, TeacherID=%s, 数量=%d", teacherID, len(reports))
+	return reports, nil
+}
+
+// EvidenceCitation methods
+
+func (r *ResultRepo) CreateCitation(ctx context.Context, citation *models.EvidenceCitation) error {
+	return r.db.WithContext(ctx).Create(citation).Error
+}
+
+func (r *ResultRepo) CreateCitations(ctx context.Context, citations []models.EvidenceCitation) error {
+	if len(citations) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Create(&citations).Error
+}
+
+func (r *ResultRepo) GetCitationsByResultID(ctx context.Context, resultID string) ([]models.EvidenceCitation, error) {
+	var citations []models.EvidenceCitation
+	if err := r.db.WithContext(ctx).Where("result_id = ?", resultID).Find(&citations).Error; err != nil {
+		return nil, err
+	}
+	return citations, nil
+}
+
+func (r *ResultRepo) GetCitationsByResultIDs(ctx context.Context, resultIDs []string) ([]models.EvidenceCitation, error) {
+	var citations []models.EvidenceCitation
+	if err := r.db.WithContext(ctx).Where("result_id IN ?", resultIDs).Find(&citations).Error; err != nil {
+		return nil, err
+	}
+	return citations, nil
 }

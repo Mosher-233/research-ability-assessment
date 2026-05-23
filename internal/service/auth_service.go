@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"research-ability-assessment/internal/models"
-	"research-ability-assessment/internal/repository/postgres"
-	"research-ability-assessment/pkg/utils"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/internal/repository/postgres"
+	"github.com/Mosher-233/research-ability-assessment/pkg/utils"
 	"strings"
 	"time"
 

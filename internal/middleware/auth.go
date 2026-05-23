@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"net/http"
-	"research-ability-assessment/internal/service"
+	"github.com/Mosher-233/research-ability-assessment/internal/service"
 	"strings"
 
 	"github.com/gin-gonic/gin"

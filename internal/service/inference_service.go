@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"research-ability-assessment/internal/llm"
-	"research-ability-assessment/internal/models"
-	"research-ability-assessment/internal/repository/postgres"
-	"research-ability-assessment/pkg/utils"
+	"github.com/Mosher-233/research-ability-assessment/internal/llm"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/internal/repository/postgres"
+	"github.com/Mosher-233/research-ability-assessment/pkg/cache"
+	"github.com/Mosher-233/research-ability-assessment/pkg/utils"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ type InferenceService struct {
 	resultRepo      *postgres.ResultRepo
 	evidenceService *EvidenceService
 	llmClient       *llm.Client
+	cache           *cache.RedisCache
 }
 
 func NewInferenceService(resultRepo *postgres.ResultRepo, evidenceService *EvidenceService) *InferenceService {
@@ -41,8 +43,12 @@ func (s *InferenceService) SetLLMClient(llmClient *llm.Client) {
 	s.llmClient = llmClient
 }
 
+func (s *InferenceService) SetCache(c *cache.RedisCache) {
+	s.cache = c
+}
+
 func (s *InferenceService) CreateInferenceResult(ctx context.Context, result *models.InferenceResult) error {
-	result.ID = utils.GenerateTaskID()
+	result.ID = utils.GenerateEvidenceID()
 	return s.resultRepo.CreateInferenceResult(ctx, result)
 }
 
@@ -68,6 +74,10 @@ func (s *InferenceService) GetAllInferenceResults(ctx context.Context) ([]models
 
 func (s *InferenceService) GetInferenceResultsByStudentID(ctx context.Context, studentID string) ([]models.InferenceResult, error) {
 	return s.resultRepo.GetInferenceResultsByStudentID(ctx, studentID)
+}
+
+func (s *InferenceService) GetInferenceResultsByTeacherID(ctx context.Context, teacherID string) ([]models.InferenceResult, error) {
+	return s.resultRepo.GetInferenceResultsByTeacherID(ctx, teacherID)
 }
 
 type GenerateInferenceRequest struct {
@@ -152,32 +162,7 @@ func (s *InferenceService) GenerateInference(ctx context.Context, req *GenerateI
 }
 
 func (s *InferenceService) getDefaultDimensions() []models.Dimension {
-	return []models.Dimension{
-		{
-			ID:          "literature_review",
-			Name:        "文献综述",
-			Description: "文献检索、综述撰写能力",
-			Weight:      0.25,
-		},
-		{
-			ID:          "research_design",
-			Name:        "研究设计",
-			Description: "研究方案设计、实验规划能力",
-			Weight:      0.25,
-		},
-		{
-			ID:          "data_analysis",
-			Name:        "数据分析",
-			Description: "数据处理、统计分析能力",
-			Weight:      0.25,
-		},
-		{
-			ID:          "critical_thinking",
-			Name:        "批判性思维",
-			Description: "批判性思考、创新思维能力",
-			Weight:      0.25,
-		},
-	}
+	return models.DefaultDimensions
 }
 
 func (s *InferenceService) calculateDimensionScore(evidences []models.Evidence, dim models.Dimension) (float64, float64) {
@@ -185,7 +170,8 @@ func (s *InferenceService) calculateDimensionScore(evidences []models.Evidence, 
 	var count int
 
 	for _, evidence := range evidences {
-		if evidence.KBMName == dim.ID || strings.Contains(evidence.Type, dim.ID) {
+		mappedDim := models.GetDimensionByKBM(evidence.KBMName)
+		if mappedDim == dim.ID {
 			if evidence.KBMLevel > 0 {
 				score := float64(evidence.KBMLevel) * 20
 				totalScore += score
@@ -211,24 +197,13 @@ func (s *InferenceService) calculateDimensionScore(evidences []models.Evidence, 
 }
 
 func (s *InferenceService) getLevelFromScore(score float64) string {
-	switch {
-	case score >= 90:
-		return "优秀"
-	case score >= 80:
-		return "良好"
-	case score >= 70:
-		return "中等"
-	case score >= 60:
-		return "及格"
-	default:
-		return "不及格"
-	}
+	return models.GetLevelFromScore(score)
 }
 
 func (s *InferenceService) getEvidenceIDsForDimension(evidences []models.Evidence, dimID string) []string {
 	var ids []string
 	for _, evidence := range evidences {
-		if evidence.KBMName == dimID || strings.Contains(evidence.Type, dimID) {
+		if models.GetDimensionByKBM(evidence.KBMName) == dimID {
 			ids = append(ids, evidence.ID)
 		}
 	}
@@ -275,6 +250,15 @@ type ClassStats struct {
 }
 
 func (s *InferenceService) GetClassStats(ctx context.Context, taskID string) (*ClassStats, error) {
+	cacheKey := "class_stats:" + taskID
+
+	if s.cache != nil && s.cache.IsAvailable() {
+		var cached ClassStats
+		if found, _ := s.cache.Get(ctx, cacheKey, &cached); found {
+			return &cached, nil
+		}
+	}
+
 	results, err := s.resultRepo.GetInferenceResultsByTaskID(ctx, taskID)
 	if err != nil {
 		return nil, err
@@ -322,13 +306,19 @@ func (s *InferenceService) GetClassStats(ctx context.Context, taskID string) (*C
 		}
 	}
 
-	return &ClassStats{
+	stats := &ClassStats{
 		ClassSize:         len(results),
 		ClassAverage:      totalScore / float64(len(results)),
 		ClassMaxScore:     maxScore,
 		ClassMinScore:     minScore,
 		DimensionAverages: dimensionAverages,
-	}, nil
+	}
+
+	if s.cache != nil && s.cache.IsAvailable() {
+		s.cache.Set(ctx, cacheKey, stats, 5*time.Minute)
+	}
+
+	return stats, nil
 }
 
 func (s *InferenceService) CalculateRankAndPercentile(ctx context.Context, studentScore float64, taskID string) (int, float64, error) {
@@ -420,8 +410,18 @@ func (s *InferenceService) GenerateInferenceWithLLM(ctx context.Context, req *Ge
 
 	result, err := s.parseLLMResponse(response, req)
 	if err != nil {
-		log.Printf("GenerateInferenceWithLLM: 解析LLM响应失败，使用简化方法: %v", err)
-		return s.GenerateInference(ctx, req)
+		log.Printf("GenerateInferenceWithLLM: 解析LLM响应失败(第1次)，重试中: %v", err)
+		// Retry once
+		response, err = s.llmClient.Chat(ctx, messages)
+		if err != nil {
+			log.Printf("GenerateInferenceWithLLM: 重试LLM调用失败，使用简化方法: %v", err)
+			return s.GenerateInference(ctx, req)
+		}
+		result, err = s.parseLLMResponse(response, req)
+		if err != nil {
+			log.Printf("GenerateInferenceWithLLM: 重试解析仍失败，使用简化方法: %v", err)
+			return s.GenerateInference(ctx, req)
+		}
 	}
 
 	log.Printf("GenerateInferenceWithLLM: 准备保存结果, ID=%s, OverallScore=%.2f, OverallLevel=%s",
@@ -439,25 +439,36 @@ func (s *InferenceService) GenerateInferenceWithLLM(ctx context.Context, req *Ge
 func (s *InferenceService) buildEvidenceContext(evidences []models.Evidence) string {
 	var sb strings.Builder
 
-	sb.WriteString("学生证据信息：\n\n")
+	sb.WriteString("## 学生证据列表\n\n")
+	sb.WriteString(fmt.Sprintf("共提交 %d 条证据。\n\n", len(evidences)))
 
-	for i, evidence := range evidences {
-		sb.WriteString(fmt.Sprintf("证据 %d:\n", i+1))
-		sb.WriteString(fmt.Sprintf("  ID: %s\n", evidence.ID))
-		sb.WriteString(fmt.Sprintf("  类型: %s\n", evidence.Type))
-		sb.WriteString(fmt.Sprintf("  KBM名称: %s\n", evidence.KBMName))
-		if evidence.KBMLevel > 0 {
-			sb.WriteString(fmt.Sprintf("  KBM级别: %d\n", evidence.KBMLevel))
-		}
-		if evidence.Content != "" {
-			sb.WriteString(fmt.Sprintf("  内容: %s\n", evidence.Content))
-		}
-		if evidence.FileName != "" {
-			sb.WriteString(fmt.Sprintf("  文件: %s\n", evidence.FileName))
-		}
-		sb.WriteString("\n")
+	// Group evidences by KBM dimension
+	dimGroups := make(map[string][]models.Evidence)
+	for _, ev := range evidences {
+		dim := models.GetDimensionByKBM(ev.KBMName)
+		dimGroups[dim] = append(dimGroups[dim], ev)
 	}
 
+	for dimID, dimEvidences := range dimGroups {
+		dimName := models.GetDimensionName(dimID)
+		sb.WriteString(fmt.Sprintf("### %s维度 (%d条证据)\n\n", dimName, len(dimEvidences)))
+		for i, ev := range dimEvidences {
+			sb.WriteString(fmt.Sprintf("**证据 %d** | KBM: %s | 类型: %s | 来源: %s", i+1, ev.KBMName, ev.Type, ev.SourceType))
+			if ev.FileName != "" {
+				sb.WriteString(fmt.Sprintf(" | 文件: %s (%s)", ev.FileName, ev.FileType))
+			}
+			sb.WriteString("\n\n")
+			if ev.Content != "" {
+				content := ev.Content
+				if len([]rune(content)) > 3000 {
+					content = string([]rune(content)[:3000]) + "\n...(内容截断)"
+				}
+				sb.WriteString(content)
+				sb.WriteString("\n\n")
+			}
+			sb.WriteString("---\n\n")
+		}
+	}
 	return sb.String()
 }
 
@@ -471,14 +482,10 @@ type LLMResponse struct {
 }
 
 func (s *InferenceService) parseLLMResponse(response string, req *GenerateInferenceRequest) (*models.InferenceResult, error) {
-	jsonStart := strings.Index(response, "{")
-	jsonEnd := strings.LastIndex(response, "}")
-
-	if jsonStart == -1 || jsonEnd == -1 {
-		return nil, fmt.Errorf("未找到JSON响应")
+	jsonStr := extractJSON(response)
+	if jsonStr == "" {
+		return nil, fmt.Errorf("未在LLM响应中找到有效JSON")
 	}
-
-	jsonStr := response[jsonStart : jsonEnd+1]
 
 	var llmResp LLMResponse
 	if err := json.Unmarshal([]byte(jsonStr), &llmResp); err != nil {
@@ -510,7 +517,7 @@ func (s *InferenceService) parseLLMResponse(response string, req *GenerateInfere
 			Name:    dimName,
 			Score:   score.Score,
 			Level:   score.Level,
-			Details: "",
+			Details: score.Reasoning,
 		}
 
 		totalWeightedScore += score.Score * weight
@@ -538,4 +545,40 @@ func (s *InferenceService) parseLLMResponse(response string, req *GenerateInfere
 	}
 
 	return result, nil
+}
+
+// extractJSON extracts a valid JSON object from text that may contain markdown wrappers.
+func extractJSON(s string) string {
+	// Try to find ```json code blocks first
+	start := strings.Index(s, "```json")
+	if start >= 0 {
+		rest := s[start+7:]
+		if end := strings.Index(rest, "```"); end >= 0 {
+			s = rest[:end]
+		}
+	} else if start = strings.Index(s, "```"); start >= 0 {
+		rest := s[start+3:]
+		if end := strings.Index(rest, "```"); end >= 0 {
+			s = rest[:end]
+		}
+	}
+
+	// Find the outermost JSON object
+	start = strings.Index(s, "{")
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	for i := start; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return s[start : i+1]
+			}
+		}
+	}
+	return ""
 }

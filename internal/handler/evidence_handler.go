@@ -1,28 +1,34 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
-	"research-ability-assessment/internal/models"
-	"research-ability-assessment/internal/service"
+	"github.com/Mosher-233/research-ability-assessment/internal/agent"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/internal/service"
+	"github.com/Mosher-233/research-ability-assessment/pkg/extractor"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
 )
 
 type EvidenceHandler struct {
 	evidenceService *service.EvidenceService
+	evidenceAgent   *agent.EvidenceAgent
+	extractorChain  *extractor.ExtractorChain
 }
 
-func NewEvidenceHandler(evidenceService *service.EvidenceService) *EvidenceHandler {
-	return &EvidenceHandler{evidenceService: evidenceService}
+func NewEvidenceHandler(evidenceService *service.EvidenceService, evidenceAgent *agent.EvidenceAgent, extractorChain *extractor.ExtractorChain) *EvidenceHandler {
+	return &EvidenceHandler{evidenceService: evidenceService, evidenceAgent: evidenceAgent, extractorChain: extractorChain}
 }
 
 type CreateEvidenceRequest struct {
 	StudentTaskID string `json:"student_task_id" binding:"required"`
 	Type         string `json:"type" binding:"required"`
 	Content      string `json:"content"`
-	KBMName      string `json:"kbm_name" binding:"required"`
+	KBMName      string `json:"kbm_name"`
 	KBMLevel     int    `json:"kbm_level" binding:"omitempty,min=1,max=5"`
 	FileName     string `json:"file_name"`
 	FilePath     string `json:"file_path"`
@@ -51,6 +57,14 @@ func (h *EvidenceHandler) CreateEvidence(c *gin.Context) {
 		FilePath:     req.FilePath,
 		FileType:     req.FileType,
 		FileSize:     req.FileSize,
+	}
+
+	if evidence.KBMName == "" && evidence.Content != "" {
+		info := h.evidenceAgent.ExtractKBMInfo(evidence.Content)
+		evidence.KBMName = info.KBMName
+		if evidence.KBMLevel == 0 {
+			evidence.KBMLevel = info.Level
+		}
 	}
 
 	if err := h.evidenceService.CreateEvidence(c.Request.Context(), evidence); err != nil {
@@ -114,11 +128,29 @@ func (h *EvidenceHandler) UploadEvidenceFile(c *gin.Context) {
 	}
 
 	content := ""
+	sourceType := "manual"
+	var extractionMeta map[string]interface{}
+
 	ext := filepath.Ext(fileName)
 	if ext == ".txt" || ext == ".md" {
 		fileContent, err := os.ReadFile(filePath)
 		if err == nil {
 			content = string(fileContent)
+		}
+		sourceType = "file_extraction"
+		extractionMeta = map[string]interface{}{
+			"method":     "direct_read",
+			"confidence": 1.0,
+		}
+	} else if h.extractorChain != nil {
+		result := h.extractorChain.Extract(filePath)
+		if result != nil {
+			content = result.Content
+			sourceType = "file_extraction"
+			extractionMeta = map[string]interface{}{
+				"method":     result.Metadata,
+				"confidence": result.Confidence,
+			}
 		}
 	}
 
@@ -131,6 +163,12 @@ func (h *EvidenceHandler) UploadEvidenceFile(c *gin.Context) {
 		FilePath:     filePath,
 		FileType:     ext,
 		FileSize:     file.Size,
+		SourceType:   sourceType,
+	}
+
+	if extractionMeta != nil {
+		metaBytes, _ := json.Marshal(extractionMeta)
+		evidence.ExtractionMetadata = datatypes.JSON(metaBytes)
 	}
 
 	if err := h.evidenceService.CreateEvidence(c.Request.Context(), evidence); err != nil {

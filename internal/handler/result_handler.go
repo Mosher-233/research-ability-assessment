@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"research-ability-assessment/internal/models"
-	"research-ability-assessment/internal/service"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +18,7 @@ type ResultHandler struct {
 	userRepo         interface {
 		GetUserByID(ctx context.Context, id string) (*models.User, error)
 	}
-	taskRepo         interface {
+	taskRepo interface {
 		GetTaskByID(ctx context.Context, id string) (*models.Task, error)
 	}
 }
@@ -211,7 +211,6 @@ func (h *ResultHandler) GenerateStudentReport(c *gin.Context) {
 		return
 	}
 
-	// 首先获取学生任务ID
 	log.Printf("GenerateStudentReport: 正在获取学生任务, StudentID=%s, TaskID=%s", studentID, taskID)
 	studentTask, err := h.taskService.GetStudentTaskByStudentAndTask(c.Request.Context(), studentID, taskID)
 	if err != nil {
@@ -273,7 +272,25 @@ func (h *ResultHandler) GenerateTaskReport(c *gin.Context) {
 }
 
 func (h *ResultHandler) GetResults(c *gin.Context) {
-	results, err := h.inferenceService.GetAllInferenceResults(c.Request.Context())
+	userID := c.GetString("userID")
+	role := c.GetString("role")
+
+	var results []models.InferenceResult
+	var err error
+
+	if role == "teacher" {
+		results, err = h.inferenceService.GetInferenceResultsByTeacherID(c.Request.Context(), userID)
+	} else if role == "student" {
+		results, err = h.inferenceService.GetInferenceResultsByStudentID(c.Request.Context(), userID)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "无效的用户角色",
+			"data":    nil,
+		})
+		return
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -330,10 +347,17 @@ type EnrichedInferenceResult struct {
 
 func (h *ResultHandler) enrichResultsWithDetails(ctx context.Context, results []models.InferenceResult) []map[string]interface{} {
 	enrichedResults := make([]map[string]interface{}, 0, len(results))
-	
+
+	// Batch-load citations for all results
+	resultIDs := make([]string, len(results))
+	for i, r := range results {
+		resultIDs[i] = r.ID
+	}
+	citationsMap := h.loadCitationsBatch(ctx, resultIDs)
+
 	for _, result := range results {
 		resultMap := make(map[string]interface{})
-		
+
 		resultMap["id"] = result.ID
 		resultMap["student_id"] = result.StudentID
 		resultMap["task_id"] = result.TaskID
@@ -343,7 +367,11 @@ func (h *ResultHandler) enrichResultsWithDetails(ctx context.Context, results []
 		resultMap["reasoning"] = result.Reasoning
 		resultMap["created_at"] = result.CreatedAt
 		resultMap["updated_at"] = result.UpdatedAt
-		
+
+		if citations, ok := citationsMap[result.ID]; ok {
+			resultMap["citations"] = citations
+		}
+
 		if h.userRepo != nil {
 			student, _ := h.userRepo.GetUserByID(ctx, result.StudentID)
 			if student != nil {
@@ -355,22 +383,64 @@ func (h *ResultHandler) enrichResultsWithDetails(ctx context.Context, results []
 				resultMap["student"] = studentMap
 			}
 		}
-		
+
 		if h.taskRepo != nil {
 			task, _ := h.taskRepo.GetTaskByID(ctx, result.TaskID)
 			if task != nil {
 				resultMap["task"] = task
 			}
 		}
-		
+
 		enrichedResults = append(enrichedResults, resultMap)
 	}
-	
+
 	return enrichedResults
 }
 
+func (h *ResultHandler) loadCitationsBatch(ctx context.Context, resultIDs []string) map[string][]models.EvidenceCitation {
+	citationsMap := make(map[string][]models.EvidenceCitation)
+	if len(resultIDs) == 0 {
+		return citationsMap
+	}
+
+	repo, ok := h.resultRepo.(interface {
+		GetCitationsByResultIDs(ctx context.Context, resultIDs []string) ([]models.EvidenceCitation, error)
+	})
+	if !ok {
+		return citationsMap
+	}
+
+	citations, err := repo.GetCitationsByResultIDs(ctx, resultIDs)
+	if err != nil {
+		return citationsMap
+	}
+
+	for _, c := range citations {
+		citationsMap[c.ResultID] = append(citationsMap[c.ResultID], c)
+	}
+	return citationsMap
+}
+
 func (h *ResultHandler) GetReports(c *gin.Context) {
-	reports, err := h.reportService.GetAllReports(c.Request.Context())
+	userID := c.GetString("userID")
+	role := c.GetString("role")
+
+	var reports []models.Report
+	var err error
+
+	if role == "teacher" {
+		reports, err = h.reportService.GetReportsByTeacherID(c.Request.Context(), userID)
+	} else if role == "student" {
+		reports, err = h.reportService.GetReportsByStudentID(c.Request.Context(), userID)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    400,
+			"message": "无效的用户角色",
+			"data":    nil,
+		})
+		return
+	}
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    500,
@@ -421,10 +491,10 @@ func (h *ResultHandler) GetStudentReports(c *gin.Context) {
 
 func (h *ResultHandler) enrichReportsWithDetails(ctx context.Context, reports []models.Report) []map[string]interface{} {
 	enrichedReports := make([]map[string]interface{}, 0, len(reports))
-	
+
 	for _, report := range reports {
 		reportMap := make(map[string]interface{})
-		
+
 		reportMap["id"] = report.ID
 		reportMap["student_task_id"] = report.StudentTaskID
 		reportMap["student_id"] = report.StudentID
@@ -443,24 +513,24 @@ func (h *ResultHandler) enrichReportsWithDetails(ctx context.Context, reports []
 		reportMap["report_path"] = report.ReportPath
 		reportMap["created_at"] = report.CreatedAt
 		reportMap["updated_at"] = report.UpdatedAt
-		
+
 		if h.userRepo != nil {
 			student, _ := h.userRepo.GetUserByID(ctx, report.StudentID)
 			if student != nil {
 				reportMap["student_name"] = student.Name
 			}
 		}
-		
+
 		if h.taskRepo != nil {
 			task, _ := h.taskRepo.GetTaskByID(ctx, report.TaskID)
 			if task != nil {
 				reportMap["task_name"] = task.Name
 			}
 		}
-		
+
 		enrichedReports = append(enrichedReports, reportMap)
 	}
-	
+
 	return enrichedReports
 }
 
@@ -487,7 +557,6 @@ func (h *ResultHandler) GenerateStudentInference(c *gin.Context) {
 
 	log.Printf("GenerateStudentInference: 开始为学生生成推理结果, StudentID=%s, TaskID=%s", userID, taskID)
 
-	// 获取学生任务
 	studentTask, err := h.taskService.GetStudentTaskByStudentAndTask(c.Request.Context(), userID, taskID)
 	if err != nil {
 		log.Printf("GenerateStudentInference: 未找到学生任务: %v", err)
@@ -501,7 +570,6 @@ func (h *ResultHandler) GenerateStudentInference(c *gin.Context) {
 
 	log.Printf("GenerateStudentInference: 找到学生任务, StudentTaskID=%s", studentTask.ID)
 
-	// 检查是否已经存在推理结果
 	existingResult, _ := h.inferenceService.GetInferenceResultByStudentAndTask(c.Request.Context(), userID, taskID)
 	if existingResult != nil {
 		log.Printf("GenerateStudentInference: 推理结果已存在, ResultID=%s", existingResult.ID)
@@ -513,7 +581,6 @@ func (h *ResultHandler) GenerateStudentInference(c *gin.Context) {
 		return
 	}
 
-	// 生成推理结果
 	result, err := h.inferenceService.GenerateInferenceWithLLM(c.Request.Context(), &service.GenerateInferenceRequest{
 		StudentTaskID: studentTask.ID,
 		StudentID:     userID,

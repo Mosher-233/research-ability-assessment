@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"research-ability-assessment/internal/llm"
-	"research-ability-assessment/internal/models"
-	"research-ability-assessment/pkg/utils"
+	"github.com/Mosher-233/research-ability-assessment/internal/llm"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/pkg/utils"
 
 	"gorm.io/gorm"
 )

@@ -2,7 +2,7 @@ package postgres
 
 import (
 	"context"
-	"research-ability-assessment/internal/models"
+	"github.com/Mosher-233/research-ability-assessment/internal/models"
 
 	"gorm.io/gorm"
 )
