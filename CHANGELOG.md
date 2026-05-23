@@ -56,7 +56,7 @@
 - Go 版本更新至 1.24
 - 新增功能特性 (异常检测、多格式提取、离线演示)
 - 新增测试章节 (运行方式、覆盖矩阵、测试数据说明)
-- 项目结构补充 (extractor、scripts、testdata、CI、papers)
+- 项目结构补充 (extractor、scripts、CI)
 
 ---
 

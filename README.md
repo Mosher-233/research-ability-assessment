@@ -128,12 +128,6 @@ go run scripts/concurrent_test.go
 | `internal/agent/` | `evidence_agent_test.go` | PreprocessEvidence, classifyWithKeywords, assessEvidenceWithRules 等 26 项 |
 | `internal/llm/` | `client_test.go` | HTTP Mock 测试（成功/错误/空响应/API Key 验证等 8 项）|
 
-### 测试数据
-
-- **数据库种子**: `scripts/init_db.go` — 1 教师 + 5 学生 + 35 条证据
-- **DOCX 文件**: `testdata/words/` — 81 个 (A-H 八级质量，3 个研究主题)
-- **PDF 文件**: `testdata/pdfs/` — 108 个 (A-H 八级质量，3 个研究主题)
-
 ## 项目结构
 
 ```
@@ -164,15 +158,10 @@ research-ability-assessment/
 │   │   ├── docx.go                 # DOCX 提取器
 │   │   └── pdf.go                  # PDF 提取器
 │   └── utils/
-├── papers/                         # 毕业论文 (draft/ + figures/)
 ├── scripts/
 │   ├── init_db.go                  # 数据库种子
 │   ├── concurrent_test.go          # 并发性能测试
 │   └── batch_llm_classify.go       # LLM 批量分类回归测试
-├── testdata/
-│   ├── words/*.docx                # 81 个 DOCX 测试文件
-│   └── pdfs/*.pdf                  # 108 个 PDF 测试文件
-├── output/                         # 测试输出和报告
 ├── .github/workflows/test.yml      # CI 自动测试
 ├── docker-compose.yml
 └── README.md
@@ -196,5 +185,4 @@ research-ability-assessment/
 - [数据库选择](docs/database_options.md)
 - [并发测试指南](docs/concurrent_testing_guide.md)
 - [结果与报告管理](docs/result_and_report_management.md)
-- [测试验证报告](output/test_validation_report.md)
 - [CHANGELOG](CHANGELOG.md)
