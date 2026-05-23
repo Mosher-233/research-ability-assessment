@@ -321,6 +321,7 @@ func TestExtractorChain_AllPDFs(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPDFExtractor_ContentQuality_SampleByClass(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	// Pick one file from each of the 8 classes (A-H)
 	samples := []string{
 		"A_S001_张明化_语音情感识别_R001.pdf",
@@ -345,6 +346,7 @@ func TestPDFExtractor_ContentQuality_SampleByClass(t *testing.T) {
 }
 
 func TestPDFExtractor_ContentQuality_SampleByTopic(t *testing.T) {
+	skipIfNoDir(t, testdataDir)
 	topicSamples := map[string]string{
 		"语音情感识别": "A_S001_张明化_语音情感识别_R001.pdf",
 		"联邦学习推荐": "B_S014_学生014_联邦学习推荐_R014.pdf",
