@@ -23,6 +23,7 @@ go.work
 # IDE and editor
 .idea/
 .vscode/
+.trae/
 *.swp
 *.swo
 *~
@@ -53,3 +54,18 @@ uploads/
 # Server executable
 server
 server.exe
+
+# Test coverage
+coverage/
+*.coverprofile
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Dump files
+*.dump
+
+# Output and temporary files
+output/
+test_evidence.md
