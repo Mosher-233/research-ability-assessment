@@ -72,3 +72,9 @@ test_evidence.md
 
 # Thesis papers (private)
 papers/
+
+# Test data files (large, private)
+testdata/
+
+# Internal analysis doc
+docs/项目分析报告.md
