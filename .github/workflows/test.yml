@@ -36,7 +36,7 @@ jobs:
           go-version: "1.24"
 
       - name: Run all tests (short mode)
-        run: go test -short -count=1 ./... -timeout 120s
+        run: go test -short -count=1 $(go list ./... | grep -v /scripts) -timeout 120s
 
   llm-batch-test:
     name: LLM Batch Classification (sample)

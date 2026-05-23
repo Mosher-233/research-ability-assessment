@@ -69,3 +69,6 @@ __pycache__/
 # Output and temporary files
 output/
 test_evidence.md
+
+# Thesis papers (private)
+papers/
